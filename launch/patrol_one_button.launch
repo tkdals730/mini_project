@@ -8,6 +8,7 @@
   <arg name="patrol_loop" default="true" />
   <arg name="patrol_wait_sec" default="5.0" />
   <arg name="use_rviz" default="true" />
+  <arg name="use_camera_viewer" default="true" />
   <arg name="rviz_config" default="$(find night_patrol_robot)/rviz/patrol.rviz" />
   <arg name="world_name" default="$(find night_patrol_robot)/worlds/office_patrol_nov2.world" />
 
@@ -21,6 +22,13 @@
         type="rviz"
         name="rviz"
         args="-d $(arg rviz_config)"
+        output="screen" />
+
+  <node if="$(arg use_camera_viewer)"
+        pkg="image_view"
+        type="image_view"
+        name="camera_image_view"
+        args="image:=/camera/rgb/image_raw"
         output="screen" />
 
   <!-- 초기 맵핑 모드 -->
