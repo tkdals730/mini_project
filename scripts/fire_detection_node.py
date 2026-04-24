@@ -12,7 +12,10 @@ class FireDetectionNode:
         self.detected_streak = 0
         self.fire_detected = False
 
+        # 테스트 월드의 fire_target은 색이 뚜렷해서,
+        # 우선은 단순한 threshold 기반으로 감지한다.
         self.min_area_ratio = rospy.get_param("~min_area_ratio", 0.015)
+        # 짧은 노이즈나 반짝임을 줄이기 위해 연속 프레임 기준을 둔다.
         self.min_frames = rospy.get_param("~min_frames", 3)
         self.use_debug_image = rospy.get_param("~use_debug_image", True)
 
@@ -21,6 +24,8 @@ class FireDetectionNode:
         rospy.Subscriber("/camera/rgb/image_raw", Image, self._image_callback, queue_size=1)
 
     def _build_fire_mask(self, hsv_image):
+        # 불 오브젝트의 발광색과 비슷한 빨강/주황 계열을 함께 마스킹한다.
+        # 실제 화재 일반화 모델이 아니라, 현재 Gazebo 오브젝트를 안정적으로 잡기 위한 기준이다.
         lower_red_1 = (0, 120, 120)
         upper_red_1 = (10, 255, 255)
         lower_red_2 = (170, 120, 120)
@@ -55,6 +60,7 @@ class FireDetectionNode:
         largest_area = 0.0
         best_rect = None
 
+        # 작은 노이즈보다 가장 큰 후보 영역을 기준으로 판단한다.
         for contour in contours:
             area = cv2.contourArea(contour)
             if area > largest_area:
@@ -62,6 +68,7 @@ class FireDetectionNode:
                 best_rect = cv2.boundingRect(contour)
 
         area_ratio = largest_area / frame_area if frame_area > 0 else 0.0
+        # 화면 대비 일정 비율 이상 보여야 실제 화재 후보로 인정한다.
         frame_detected = area_ratio >= self.min_area_ratio
 
         if frame_detected:
@@ -69,6 +76,7 @@ class FireDetectionNode:
         else:
             self.detected_streak = 0
 
+        # 한 프레임짜리 오탐을 줄이기 위해 연속 프레임 기준을 둔다.
         new_state = self.detected_streak >= self.min_frames
         if new_state != self.fire_detected:
             self.fire_detected = new_state

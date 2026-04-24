@@ -22,6 +22,7 @@ class PatrolWaypointsNode:
 
         self.loop_enabled = rospy.get_param("~patrol_loop", True)
         self.wait_after_goal_sec = rospy.get_param("~wait_after_goal_sec", 5.0)
+        # 위치 초기화 직후 goal을 보내면 경로가 흔들릴 수 있어서 대기 시간을 둔다.
         self.initial_wait_sec = rospy.get_param("~initial_wait_sec", 2.0)
         self.waypoints = rospy.get_param("~waypoints", [])
 
@@ -38,6 +39,7 @@ class PatrolWaypointsNode:
         while not rospy.is_shutdown() and not self.initial_pose_received:
             wait_rate.sleep()
 
+        # 첫 goal을 보내기 전에 AMCL 위치추정이 잠깐 안정될 시간을 둔다.
         rospy.sleep(self.initial_wait_sec)
 
     def _amcl_pose_callback(self, _msg):
@@ -74,6 +76,8 @@ class PatrolWaypointsNode:
                 self.client.wait_for_result()
                 state = self.client.get_state()
 
+                # 순찰 루프를 단순하게 유지하기 위해, goal 하나가 실패하면
+                # 복잡한 복구 로직 대신 다음 사이클에서 다시 시도한다.
                 if state != GoalStatus.SUCCEEDED:
                     rospy.logwarn("Waypoint %d failed with state %d. Retrying on next cycle.", index, state)
                     break

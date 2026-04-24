@@ -25,9 +25,13 @@ class FrontierExploreNode:
         self.current_goal = None
         self.last_goal_time = rospy.Time(0)
 
+        # 같은 goal에 너무 오래 묶이지 않게 해서, 막힌 구역이면 빨리 다른 frontier를 보게 한다.
         self.goal_timeout = rospy.Duration(rospy.get_param("~goal_timeout_sec", 8.0))
+        # 로봇 바로 주변의 frontier는 의미 없는 미세 이동이 되기 쉬워서 최소 거리를 둔다.
         self.min_goal_distance = rospy.get_param("~min_goal_distance", 0.4)
+        # 한 번 실패한 지점 주변은 잠시 제외해서 같은 실패를 반복하지 않게 한다.
         self.blacklist_radius = rospy.get_param("~blacklist_radius", 0.3)
+        # frontier 주변 여유 공간을 조금 확인해서 지나치게 벽에 붙은 goal은 피한다.
         self.frontier_clearance_cells = rospy.get_param("~frontier_clearance_cells", 2)
 
         rospy.Subscriber("/map", OccupancyGrid, self._map_callback)
@@ -60,6 +64,7 @@ class FrontierExploreNode:
         return False
 
     def _has_free_clearance(self, gx, gy, width, height, data):
+        # frontier 주변에 장애물이 너무 가까우면, move_base가 접근하기 어렵다고 보고 제외한다.
         radius = self.frontier_clearance_cells
         for ny in range(max(0, gy - radius), min(height, gy + radius + 1)):
             for nx in range(max(0, gx - radius), min(width, gx + radius + 1)):
@@ -88,6 +93,7 @@ class FrontierExploreNode:
                 if data[idx] != 0:
                     continue
 
+                # frontier는 미탐색 셀(-1)과 맞닿아 있는 자유 공간 셀(0)로 본다.
                 has_unknown_neighbor = False
                 for ny in range(gy - 1, gy + 2):
                     for nx in range(gx - 1, gx + 2):
@@ -112,6 +118,9 @@ class FrontierExploreNode:
                 if self._is_blacklisted(wx, wy):
                     continue
 
+                # 현재는 가까운 frontier를 우선 선택하는 단순 기준을 사용한다.
+                # 맵을 빠르게 넓히는 데는 충분하지만, 나중에 필요하면 정보량이나
+                # 시야 확보 정도를 점수에 추가해서 더 똑똑하게 고를 수 있다.
                 score = distance
                 if best_score is None or score < best_score:
                     best_score = score
@@ -147,6 +156,8 @@ class FrontierExploreNode:
             self.current_goal = None
             return
 
+        # move_base가 너무 오래 같은 goal에 매달리면,
+        # 일단 그 구역은 포기하고 다른 frontier를 고르게 한다.
         if rospy.Time.now() - self.last_goal_time > self.goal_timeout:
             rospy.logwarn("Frontier goal timed out, blacklisting area.")
             self.move_base.cancel_goal()
@@ -171,6 +182,8 @@ class FrontierExploreNode:
             if self.current_goal is None:
                 frontier_goal = self._find_frontier_goal(robot_x, robot_y)
                 if frontier_goal is not None:
+                    # 목표 자세는 현재 로봇 heading을 대략 유지하고,
+                    # 세부 접근은 move_base가 처리하도록 둔다.
                     self._send_goal(frontier_goal[0], frontier_goal[1], robot_yaw)
                 else:
                     rospy.loginfo_throttle(5.0, "No reachable frontier found right now.")
