@@ -10,6 +10,7 @@
   <arg name="use_rviz" default="true" />
   <arg name="use_camera_viewer" default="true" />
   <arg name="use_fire_detection" default="true" />
+  <arg name="camera_view_topic" default="/fire_detection/debug_image" />
   <arg name="mapping_strategy" default="frontier" />
   <arg name="rviz_config" default="$(find night_patrol_robot)/rviz/patrol.rviz" />
   <!-- <arg name="world_name" default="$(find night_patrol_robot)/worlds/office_patrolv3.world" /> -->
@@ -32,7 +33,7 @@
         pkg="image_view"
         type="image_view"
         name="camera_image_view"
-        args="image:=/camera/rgb/image_raw"
+        args="image:=$(arg camera_view_topic)"
         output="screen" />
 
   <node if="$(arg use_fire_detection)"

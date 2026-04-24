@@ -11,12 +11,15 @@ class FireDetectionNode:
         self.bridge = CvBridge()
         self.detected_streak = 0
         self.fire_detected = False
+        self.last_alert_time = rospy.Time(0)
 
         # 테스트 월드의 fire_target은 색이 뚜렷해서,
         # 우선은 단순한 threshold 기반으로 감지한다.
         self.min_area_ratio = rospy.get_param("~min_area_ratio", 0.015)
         # 짧은 노이즈나 반짝임을 줄이기 위해 연속 프레임 기준을 둔다.
         self.min_frames = rospy.get_param("~min_frames", 3)
+        # 화재가 계속 보이는 동안 경고 로그를 이 주기로 반복한다.
+        self.alert_interval = rospy.Duration(rospy.get_param("~alert_interval_sec", 2.0))
         self.use_debug_image = rospy.get_param("~use_debug_image", True)
 
         self.detection_pub = rospy.Publisher("/fire_detected", Bool, queue_size=10)
@@ -81,9 +84,14 @@ class FireDetectionNode:
         if new_state != self.fire_detected:
             self.fire_detected = new_state
             if self.fire_detected:
+                self.last_alert_time = rospy.Time.now()
                 rospy.logwarn("FIRE DETECTED: area_ratio=%.3f streak=%d", area_ratio, self.detected_streak)
             else:
                 rospy.loginfo("Fire detection cleared.")
+
+        if self.fire_detected and rospy.Time.now() - self.last_alert_time >= self.alert_interval:
+            self.last_alert_time = rospy.Time.now()
+            rospy.logwarn("FIRE STILL DETECTED: area_ratio=%.3f streak=%d", area_ratio, self.detected_streak)
 
         self.detection_pub.publish(Bool(data=self.fire_detected))
 
