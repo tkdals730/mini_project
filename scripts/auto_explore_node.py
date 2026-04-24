@@ -1,30 +1,36 @@
 #!/usr/bin/env python3
+import math
 import rospy
 from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import Twist
 
-front = 999
-left = 999
-right = 999
+front = 999.0
+left = 999.0
+right = 999.0
+
+
+def _sector_min(msg, center_rad, half_width_rad=0.30):
+    vals = []
+    for i, r in enumerate(msg.ranges):
+        if not (msg.range_min < r < msg.range_max):
+            continue
+        angle = msg.angle_min + (i * msg.angle_increment)
+
+        # -pi~pi 범위로 정규화해서 섹터 비교
+        diff = math.atan2(math.sin(angle - center_rad), math.cos(angle - center_rad))
+        if abs(diff) <= half_width_rad:
+            vals.append(r)
+
+    return min(vals) if vals else 999.0
 
 def scan_callback(msg):
     global front, left, right
 
-    ranges = msg.ranges
-    n = len(ranges)
-
-    # 구간 나누기
-    front_vals = ranges[n//2 - 20 : n//2 + 20]
-    left_vals  = ranges[int(n*0.75) : int(n*0.9)]
-    right_vals = ranges[int(n*0.1)  : int(n*0.25)]
-
-    def get_min(vals):
-        vals = [v for v in vals if v > 0.05 and v < 10.0]
-        return min(vals) if vals else 999
-
-    front = get_min(front_vals)
-    left  = get_min(left_vals)
-    right = get_min(right_vals)
+    # LaserScan 각도 기준으로 전/좌/우 거리 계산
+    # 전방: 0rad, 좌측: +90deg, 우측: -90deg
+    front = _sector_min(msg, 0.0, half_width_rad=0.35)
+    left = _sector_min(msg, math.pi / 2.0, half_width_rad=0.35)
+    right = _sector_min(msg, -math.pi / 2.0, half_width_rad=0.35)
 
 def main():
     rospy.init_node("auto_explore_node")
@@ -37,6 +43,7 @@ def main():
     SAFE_FRONT = 0.8
     DANGER_FRONT = 0.45
     SAFE_SIDE = 0.35
+
     while not rospy.is_shutdown():
         cmd = Twist()
 
@@ -63,6 +70,7 @@ def main():
 
         pub.publish(cmd)
         rate.sleep()
+
 
 if __name__ == "__main__":
     main()
