@@ -9,8 +9,9 @@
   <arg name="patrol_wait_sec" default="5.0" />
   <arg name="use_rviz" default="true" />
   <arg name="use_camera_viewer" default="true" />
+  <arg name="mapping_strategy" default="frontier" />
   <arg name="rviz_config" default="$(find night_patrol_robot)/rviz/patrol.rviz" />
-  <arg name="world_name" default="$(find night_patrol_robot)/worlds/office_patrol_nov2.world" />
+  <arg name="world_name" default="$(find night_patrol_robot)/worlds/office_patrol_nov3.world" />
 
   <!-- 공통: 시뮬레이터 + 로봇 -->
   <include file="$(find night_patrol_robot)/launch/gazebo_robot.launch">
@@ -41,10 +42,26 @@
       <param name="minimumScore" value="100" />
     </node>
 
-    <node pkg="night_patrol_robot"
-          type="auto_explore_node.py"
-          name="auto_explore_node"
-          output="screen" />
+    <group if="$(eval arg('mapping_strategy') == 'frontier')">
+      <rosparam command="load" file="$(find night_patrol_robot)/config/costmap_common.yaml" ns="move_base/global_costmap" />
+      <rosparam command="load" file="$(find night_patrol_robot)/config/costmap_common.yaml" ns="move_base/local_costmap" />
+      <rosparam command="load" file="$(find night_patrol_robot)/config/global_costmap.yaml" ns="move_base/global_costmap" />
+      <rosparam command="load" file="$(find night_patrol_robot)/config/local_costmap.yaml" ns="move_base/local_costmap" />
+      <rosparam command="load" file="$(find night_patrol_robot)/config/move_base.yaml" />
+      <node pkg="move_base" type="move_base" name="move_base" output="screen" />
+
+      <node pkg="night_patrol_robot"
+            type="frontier_explore_node.py"
+            name="frontier_explore_node"
+            output="screen" />
+    </group>
+
+    <group unless="$(eval arg('mapping_strategy') == 'frontier')">
+      <node pkg="night_patrol_robot"
+            type="auto_explore_node.py"
+            name="auto_explore_node"
+            output="screen" />
+    </group>
   </group>
 
   <!-- 저장 맵 순찰 모드 -->

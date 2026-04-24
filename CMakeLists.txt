@@ -13,6 +13,7 @@ find_package(catkin REQUIRED COMPONENTS
   cv_bridge
   geometry_msgs
   move_base_msgs
+  nav_msgs
   rospy
   sensor_msgs
   std_msgs
@@ -167,6 +168,7 @@ include_directories(
 ## in contrast to setup.py, you can choose the destination
 catkin_install_python(PROGRAMS
   scripts/auto_explore_node.py
+  scripts/frontier_explore_node.py
   scripts/patrol_waypoints_node.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
