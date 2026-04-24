@@ -9,9 +9,12 @@
   <arg name="patrol_wait_sec" default="5.0" />
   <arg name="use_rviz" default="true" />
   <arg name="use_camera_viewer" default="true" />
+  <arg name="use_fire_detection" default="true" />
   <arg name="mapping_strategy" default="frontier" />
   <arg name="rviz_config" default="$(find night_patrol_robot)/rviz/patrol.rviz" />
-  <arg name="world_name" default="$(find night_patrol_robot)/worlds/office_patrol_nov3.world" />
+  <!-- <arg name="world_name" default="$(find night_patrol_robot)/worlds/office_patrolv3.world" /> -->
+  <!-- <arg name="world_name" default="$(find night_patrol_robot)/worlds/office_patrol_nov3.world" /> -->
+  <arg name="world_name" default="$(find night_patrol_robot)/worlds/office_fire_detection_test.world" />
 
   <!-- 공통: 시뮬레이터 + 로봇 -->
   <include file="$(find night_patrol_robot)/launch/gazebo_robot.launch">
@@ -30,6 +33,12 @@
         type="image_view"
         name="camera_image_view"
         args="image:=/camera/rgb/image_raw"
+        output="screen" />
+
+  <node if="$(arg use_fire_detection)"
+        pkg="night_patrol_robot"
+        type="fire_detection_node.py"
+        name="fire_detection_node"
         output="screen" />
 
   <!-- 초기 맵핑 모드 -->
