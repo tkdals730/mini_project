@@ -9,28 +9,36 @@ left = 999.0
 right = 999.0
 
 
+def clamp(value, low, high):
+    return max(low, min(high, value))
+
+
 def _sector_min(msg, center_rad, half_width_rad=0.30):
     vals = []
     for i, r in enumerate(msg.ranges):
         if not (msg.range_min < r < msg.range_max):
             continue
+
         angle = msg.angle_min + (i * msg.angle_increment)
 
-        # -pi~pi 범위로 정규화해서 섹터 비교
-        diff = math.atan2(math.sin(angle - center_rad), math.cos(angle - center_rad))
+        diff = math.atan2(
+            math.sin(angle - center_rad),
+            math.cos(angle - center_rad)
+        )
+
         if abs(diff) <= half_width_rad:
             vals.append(r)
 
     return min(vals) if vals else 999.0
 
+
 def scan_callback(msg):
     global front, left, right
 
-    # LaserScan 각도 기준으로 전/좌/우 거리 계산
-    # 전방: 0rad, 좌측: +90deg, 우측: -90deg
     front = _sector_min(msg, 0.0, half_width_rad=0.35)
     left = _sector_min(msg, math.pi / 2.0, half_width_rad=0.35)
     right = _sector_min(msg, -math.pi / 2.0, half_width_rad=0.35)
+
 
 def main():
     rospy.init_node("auto_explore_node")
@@ -40,33 +48,32 @@ def main():
 
     rate = rospy.Rate(10)
 
-    SAFE_FRONT = 0.8
-    DANGER_FRONT = 0.45
-    SAFE_SIDE = 0.35
+    FRONT_DANGER = 0.30
+    FRONT_BLOCKED = 0.55
+    TARGET_RIGHT = 0.50
+    WALL_DETECT = 1.20
+    BASE_SPEED = 0.13
+    KP_RIGHT = 1.6
 
     while not rospy.is_shutdown():
         cmd = Twist()
 
+        if front < FRONT_DANGER:
+            cmd.linear.x = -0.10
+            cmd.angular.z = 0.9 if left > right else -0.9
 
-        if front < DANGER_FRONT:
-            cmd.linear.x = -0.12
+        elif front < FRONT_BLOCKED:
+            cmd.linear.x = 0.0
             cmd.angular.z = 0.8 if left > right else -0.8
 
-        elif left < SAFE_SIDE:
-            cmd.linear.x = 0.03
-            cmd.angular.z = -0.6
-
-        elif right < SAFE_SIDE:
-            cmd.linear.x = 0.03
-            cmd.angular.z = 0.6
-
-        elif front < SAFE_FRONT:
-            cmd.linear.x = 0.0
-            cmd.angular.z = 0.6 if left > right else -0.6
-
         else:
-            cmd.linear.x = 0.12
-            cmd.angular.z = 0.15 if left > right else -0.15
+            cmd.linear.x = BASE_SPEED
+
+            if right < WALL_DETECT:
+                error = TARGET_RIGHT - right
+                cmd.angular.z = clamp(KP_RIGHT * error, -0.6, 0.6)
+            else:
+                cmd.angular.z = 0.0
 
         pub.publish(cmd)
         rate.sleep()

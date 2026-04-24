@@ -1,0 +1,9 @@
+<launch>
+  <arg name="map_output" default="$(find night_patrol_robot)/maps/patrol_map" />
+
+  <node pkg="map_server"
+        type="map_saver"
+        name="map_saver"
+        args="-f $(arg map_output)"
+        output="screen" />
+</launch>
