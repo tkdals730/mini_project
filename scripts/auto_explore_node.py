@@ -3,22 +3,28 @@ import rospy
 from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import Twist
 
-front_dist = 999.0
+front = 999
+left = 999
+right = 999
 
 def scan_callback(msg):
-    global front_dist
+    global front, left, right
 
-    # 라이다 정면 근처 거리만 사용
-    ranges = list(msg.ranges)
-    center = len(ranges) // 2
-    front_values = ranges[center-15:center+15]
+    ranges = msg.ranges
+    n = len(ranges)
 
-    valid = [r for r in front_values if r > 0.05 and r < 10.0]
+    # 구간 나누기
+    front_vals = ranges[n//2 - 20 : n//2 + 20]
+    left_vals  = ranges[int(n*0.75) : int(n*0.9)]
+    right_vals = ranges[int(n*0.1)  : int(n*0.25)]
 
-    if valid:
-        front_dist = min(valid)
-    else:
-        front_dist = 999.0
+    def get_min(vals):
+        vals = [v for v in vals if v > 0.05 and v < 10.0]
+        return min(vals) if vals else 999
+
+    front = get_min(front_vals)
+    left  = get_min(left_vals)
+    right = get_min(right_vals)
 
 def main():
     rospy.init_node("auto_explore_node")
@@ -28,15 +34,32 @@ def main():
 
     rate = rospy.Rate(10)
 
+    SAFE_FRONT = 0.8
+    DANGER_FRONT = 0.45
+    SAFE_SIDE = 0.35
     while not rospy.is_shutdown():
         cmd = Twist()
 
-        if front_dist > 0.7:
-            cmd.linear.x = 0.15
-            cmd.angular.z = 0.0
-        else:
+
+        if front < DANGER_FRONT:
+            cmd.linear.x = -0.12
+            cmd.angular.z = 0.8 if left > right else -0.8
+
+        elif left < SAFE_SIDE:
+            cmd.linear.x = 0.03
+            cmd.angular.z = -0.6
+
+        elif right < SAFE_SIDE:
+            cmd.linear.x = 0.03
+            cmd.angular.z = 0.6
+
+        elif front < SAFE_FRONT:
             cmd.linear.x = 0.0
-            cmd.angular.z = 0.5
+            cmd.angular.z = 0.6 if left > right else -0.6
+
+        else:
+            cmd.linear.x = 0.12
+            cmd.angular.z = 0.15 if left > right else -0.15
 
         pub.publish(cmd)
         rate.sleep()
