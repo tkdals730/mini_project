@@ -25,7 +25,7 @@ class FrontierExploreNode:
         self.current_goal = None
         self.last_goal_time = rospy.Time(0)
 
-        self.goal_timeout = rospy.Duration(rospy.get_param("~goal_timeout_sec", 15.0))
+        self.goal_timeout = rospy.Duration(rospy.get_param("~goal_timeout_sec", 8.0))
         self.min_goal_distance = rospy.get_param("~min_goal_distance", 0.4)
         self.blacklist_radius = rospy.get_param("~blacklist_radius", 0.3)
         self.frontier_clearance_cells = rospy.get_param("~frontier_clearance_cells", 2)
