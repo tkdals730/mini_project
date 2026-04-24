@@ -2,7 +2,7 @@
 
   <!-- Gazebo 실행 -->
   <include file="$(find gazebo_ros)/launch/empty_world.launch">
-    <arg name="world_name" value="$(find night_patrol_robot)/worlds/office_patrol.world"/>
+    <arg name="world_name" value="$(find night_patrol_robot)/worlds/office_patrol_no.world"/>
   </include>
 
   <!-- xacro → robot_description -->
