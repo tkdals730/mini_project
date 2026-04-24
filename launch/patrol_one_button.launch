@@ -9,9 +9,12 @@
   <arg name="patrol_wait_sec" default="5.0" />
   <arg name="use_rviz" default="true" />
   <arg name="rviz_config" default="$(find night_patrol_robot)/rviz/patrol.rviz" />
+  <arg name="world_name" default="$(find night_patrol_robot)/worlds/office_patrol_nov2.world" />
 
   <!-- 공통: 시뮬레이터 + 로봇 -->
-  <include file="$(find night_patrol_robot)/launch/gazebo_robot.launch" />
+  <include file="$(find night_patrol_robot)/launch/gazebo_robot.launch">
+    <arg name="world_name" value="$(arg world_name)" />
+  </include>
 
   <node if="$(arg use_rviz)"
         pkg="rviz"
@@ -22,7 +25,7 @@
 
   <!-- 초기 맵핑 모드 -->
   <group if="$(arg mapping)">
-    <node pkg="slam_gmapping" type="slam_gmapping" name="slam_gmapping" output="screen">
+    <node pkg="gmapping" type="slam_gmapping" name="slam_gmapping" output="screen">
       <param name="base_frame" value="base_footprint" />
       <param name="odom_frame" value="odom" />
       <param name="map_update_interval" value="2.0" />
