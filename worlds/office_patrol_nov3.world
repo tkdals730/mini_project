@@ -97,11 +97,11 @@
       <link name="link"><collision name="col"><geometry><box><size>2.40 0.12 2.0</size></box></geometry></collision><visual name="vis"><geometry><box><size>2.40 0.12 2.0</size></box></geometry><material><ambient>0.33 0.33 0.33 1</ambient><diffuse>0.33 0.33 0.33 1</diffuse></material></visual></link>
     </model>
 
-    <model name="wall_office_partition">
+    <!-- <model name="wall_office_partition">
       <static>true</static>
       <pose>-0.95 8.05 1 0 0 0</pose>
       <link name="link"><collision name="col"><geometry><box><size>0.12 1.20 2.0</size></box></geometry></collision><visual name="vis"><geometry><box><size>0.12 1.20 2.0</size></box></geometry><material><ambient>0.33 0.33 0.33 1</ambient><diffuse>0.33 0.33 0.33 1</diffuse></material></visual></link>
-    </model>
+    </model> -->
 
     <!-- ===================== FURNITURE ===================== -->
     <!-- 회의실 테이블 -->
