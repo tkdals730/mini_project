@@ -1,0 +1,16 @@
+<launch>
+
+  <!-- Gazebo 실행 -->
+  <include file="$(find gazebo_ros)/launch/empty_world.launch">
+    <arg name="world_name" value="$(find night_patrol_robot)/worlds/office_patrol.world"/>
+  </include>
+
+  <!-- xacro → robot_description -->
+  <param name="robot_description" command="$(find xacro)/xacro $(find night_patrol_robot)/urdf/diff_wheeled_robot_with_laser.xacro" />
+
+  <!-- 로봇 스폰 -->
+  <node name="spawn_model" pkg="gazebo_ros" type="spawn_model"
+        args="-urdf -param robot_description -model my_robot"
+        output="screen"/>
+
+</launch>
