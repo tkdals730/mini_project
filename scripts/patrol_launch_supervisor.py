@@ -56,6 +56,7 @@ class PatrolLaunchSupervisor:
             "world_name",
             "frontier_goal_timeout_sec",
             "frontier_min_goal_distance",
+            "frontier_max_goal_distance",
             "frontier_blacklist_radius",
             "frontier_blacklist_ttl_sec",
             "frontier_blacklist_max_size",

@@ -35,6 +35,8 @@ class FrontierExploreNode:
         self.goal_timeout = rospy.Duration(rospy.get_param("~goal_timeout_sec", 8.0))
         # 로봇 바로 주변의 frontier는 의미 없는 미세 이동이 되기 쉬워서 최소 거리를 둔다.
         self.min_goal_distance = rospy.get_param("~min_goal_distance", 0.4)
+        # 0보다 크면 너무 먼 frontier goal은 제외해서 move_base 실패 가능성을 줄인다.
+        self.max_goal_distance = rospy.get_param("~max_goal_distance", 0.0)
         # 한 번 실패한 지점 주변은 잠시 제외해서 같은 실패를 반복하지 않게 한다.
         self.blacklist_radius = rospy.get_param("~blacklist_radius", 0.3)
         self.blacklist_ttl = rospy.Duration(rospy.get_param("~blacklist_ttl_sec", 60.0))
@@ -261,6 +263,8 @@ class FrontierExploreNode:
             wx, wy, gx, gy = goal
             distance = math.hypot(wx - robot_x, wy - robot_y)
             if distance < self.min_goal_distance:
+                continue
+            if self.max_goal_distance > 0.0 and distance > self.max_goal_distance:
                 continue
 
             score, information_gain, obstacle_penalty = self._score_frontier(

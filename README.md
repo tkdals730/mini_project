@@ -145,6 +145,7 @@ roslaunch night_patrol_robot patrol_one_button.launch mapping:=false patrol_loop
 
 - `frontier_goal_timeout_sec`: goal 하나에 머무는 최대 시간
 - `frontier_min_goal_distance`: 너무 가까운 frontier 제외 거리
+- `frontier_max_goal_distance`: 너무 먼 frontier 제외 거리, `0.0`이면 비활성화
 - `frontier_blacklist_radius`: 실패한 goal 주변 제외 반경
 - `frontier_blacklist_ttl_sec`: 실패한 goal을 blacklist에 유지하는 시간
 - `frontier_blacklist_max_size`: blacklist에 보관할 최대 goal 개수
