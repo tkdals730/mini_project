@@ -15,8 +15,10 @@
   <arg name="use_fire_detection" default="true" />
   <arg name="camera_view_topic" default="/fire_detection/debug_image" />
   <arg name="mapping_strategy" default="frontier" />
+  <!-- rviz 설정 -->
   <arg name="rviz_config" default="$(find night_patrol_robot)/rviz/patrol.rviz" />
-  <arg name="world_name" default="$(find night_patrol_robot)/worlds/office_patrolv4.world" />
+  <!-- 맵 설정 -->
+  <arg name="world_name" default="$(find night_patrol_robot)/worlds/office_patrol_nov4.world" />
   <arg name="frontier_goal_timeout_sec" default="12.0" />
   <arg name="frontier_min_goal_distance" default="0.4" />
   <arg name="frontier_max_goal_distance" default="0.0" />
