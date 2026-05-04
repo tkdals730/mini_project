@@ -1,0 +1,114 @@
+<launch>
+  <!--
+    mapping:=true  -> 초기 1회 SLAM + 자동 탐색 + 맵 자동 저장
+    mapping:=false -> 저장 맵 기반 waypoint 순찰
+  -->
+  <arg name="mapping" default="true" />
+  <arg name="map_output" default="$(find night_patrol_robot)/maps/patrol_map" />
+  <arg name="map_file" default="$(find night_patrol_robot)/maps/patrol_map.yaml" />
+  <arg name="patrol_loop" default="true" />
+  <arg name="patrol_wait_sec" default="5.0" />
+  <arg name="use_rviz" default="true" />
+  <arg name="use_camera_viewer" default="true" />
+  <arg name="use_fire_detection" default="true" />
+  <arg name="camera_view_topic" default="/fire_detection/debug_image" />
+  <arg name="mapping_strategy" default="frontier" />
+  <arg name="rviz_config" default="$(find night_patrol_robot)/rviz/patrol.rviz" />
+  <!-- 맵 설정 -->
+  <!-- <arg name="world_name" default="$(find night_patrol_robot)/worlds/office_patrolv3.world" /> -->
+  <arg name="world_name" default="$(find night_patrol_robot)/worlds/office_patrol_nov3.world" />
+  <!-- <arg name="world_name" default="$(find night_patrol_robot)/worlds/office_fire_detection_test.world" /> -->
+
+  <!-- 공통: 시뮬레이터 + 로봇 -->
+  <include file="$(find night_patrol_robot)/launch/gazebo_robot.launch">
+    <arg name="world_name" value="$(arg world_name)" />
+  </include>
+
+  <node if="$(arg use_rviz)"
+        pkg="rviz"
+        type="rviz"
+        name="rviz"
+        args="-d $(arg rviz_config)"
+        output="screen" />
+
+  <node if="$(arg use_camera_viewer)"
+        pkg="image_view"
+        type="image_view"
+        name="camera_image_view"
+        args="image:=$(arg camera_view_topic)"
+        output="screen" />
+
+  <node if="$(arg use_fire_detection)"
+        pkg="night_patrol_robot"
+        type="fire_detection_node.py"
+        name="fire_detection_node"
+        output="screen" />
+
+  <!-- 초기 맵핑 모드 -->
+  <group if="$(arg mapping)">
+    <node pkg="gmapping" type="slam_gmapping" name="slam_gmapping" output="screen">
+      <param name="base_frame" value="base_footprint" />
+      <param name="odom_frame" value="odom" />
+      <param name="map_update_interval" value="2.0" />
+      <param name="maxUrange" value="6.0" />
+      <param name="minimumScore" value="100" />
+    </node>
+
+    <group if="$(eval arg('mapping_strategy') == 'frontier')">
+      <rosparam command="load" file="$(find night_patrol_robot)/config/costmap_common.yaml" ns="move_base/global_costmap" />
+      <rosparam command="load" file="$(find night_patrol_robot)/config/costmap_common.yaml" ns="move_base/local_costmap" />
+      <rosparam command="load" file="$(find night_patrol_robot)/config/global_costmap.yaml" ns="move_base/global_costmap" />
+      <rosparam command="load" file="$(find night_patrol_robot)/config/local_costmap.yaml" ns="move_base/local_costmap" />
+      <rosparam command="load" file="$(find night_patrol_robot)/config/move_base.yaml" />
+      <node pkg="move_base" type="move_base" name="move_base" output="screen" />
+
+      <node pkg="night_patrol_robot"
+            type="frontier_explore_node.py"
+            name="frontier_explore_node"
+            output="screen" />
+
+      <node pkg="night_patrol_robot"
+            type="auto_map_saver_node.py"
+            name="auto_map_saver_node"
+            output="screen">
+        <param name="map_output" value="$(arg map_output)" />
+      </node>
+    </group>
+
+    <group unless="$(eval arg('mapping_strategy') == 'frontier')">
+      <node pkg="night_patrol_robot"
+            type="auto_explore_node.py"
+            name="auto_explore_node"
+            output="screen" />
+    </group>
+  </group>
+
+  <!-- 저장 맵 순찰 모드 -->
+  <group unless="$(arg mapping)">
+    <node pkg="map_server" type="map_server" name="map_server" args="$(arg map_file)" />
+
+    <rosparam command="load" file="$(find night_patrol_robot)/config/amcl.yaml" />
+    <node pkg="amcl" type="amcl" name="amcl" output="screen" />
+
+    <rosparam command="load" file="$(find night_patrol_robot)/config/costmap_common.yaml" ns="move_base/global_costmap" />
+    <rosparam command="load" file="$(find night_patrol_robot)/config/costmap_common.yaml" ns="move_base/local_costmap" />
+    <rosparam command="load" file="$(find night_patrol_robot)/config/global_costmap.yaml" ns="move_base/global_costmap" />
+    <rosparam command="load" file="$(find night_patrol_robot)/config/local_costmap.yaml" ns="move_base/local_costmap" />
+    <rosparam command="load" file="$(find night_patrol_robot)/config/move_base.yaml" />
+    <node pkg="move_base" type="move_base" name="move_base" output="screen" />
+
+    <node pkg="night_patrol_robot"
+          type="patrol_waypoints_node.py"
+          name="patrol_waypoints_node"
+          output="screen">
+      <param name="patrol_loop" value="$(arg patrol_loop)" />
+      <param name="wait_after_goal_sec" value="$(arg patrol_wait_sec)" />
+      <rosparam param="waypoints">
+        - {x: 0.0, y: 0.0, yaw: 0.0, wait_sec: 3.0}
+        - {x: 1.8, y: 0.0, yaw: 0.0, wait_sec: 5.0}
+        - {x: 1.8, y: 1.6, yaw: 1.57, wait_sec: 5.0}
+        - {x: 0.2, y: 1.6, yaw: 3.14, wait_sec: 5.0}
+      </rosparam>
+    </node>
+  </group>
+</launch>
