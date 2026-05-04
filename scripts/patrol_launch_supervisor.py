@@ -54,6 +54,22 @@ class PatrolLaunchSupervisor:
             "mapping_strategy",
             "rviz_config",
             "world_name",
+            "frontier_goal_timeout_sec",
+            "frontier_min_goal_distance",
+            "frontier_blacklist_radius",
+            "frontier_blacklist_ttl_sec",
+            "frontier_blacklist_max_size",
+            "frontier_clearance_cells",
+            "frontier_occupied_threshold",
+            "frontier_information_radius_cells",
+            "frontier_obstacle_penalty_radius_cells",
+            "frontier_information_gain_weight",
+            "frontier_distance_weight",
+            "frontier_obstacle_penalty_weight",
+            "frontier_min_cluster_size",
+            "frontier_size_weight",
+            "frontier_max_score_distance",
+            "exploration_complete_wait_sec",
         ]
         cli_args = ["mapping:=%s" % self.mapping_value]
         cli_args.extend("%s:=%s" % (name, _param_as_launch_value(name)) for name in arg_names)

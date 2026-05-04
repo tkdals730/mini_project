@@ -14,9 +14,25 @@
   <arg name="camera_view_topic" default="/fire_detection/debug_image" />
   <arg name="mapping_strategy" default="frontier" />
   <arg name="rviz_config" default="$(find night_patrol_robot)/rviz/patrol.rviz" />
+  <arg name="frontier_goal_timeout_sec" default="8.0" />
+  <arg name="frontier_min_goal_distance" default="0.4" />
+  <arg name="frontier_blacklist_radius" default="0.3" />
+  <arg name="frontier_blacklist_ttl_sec" default="60.0" />
+  <arg name="frontier_blacklist_max_size" default="30" />
+  <arg name="frontier_clearance_cells" default="2" />
+  <arg name="frontier_occupied_threshold" default="40" />
+  <arg name="frontier_information_radius_cells" default="4" />
+  <arg name="frontier_obstacle_penalty_radius_cells" default="3" />
+  <arg name="frontier_information_gain_weight" default="1.0" />
+  <arg name="frontier_distance_weight" default="0.25" />
+  <arg name="frontier_obstacle_penalty_weight" default="0.25" />
+  <arg name="frontier_min_cluster_size" default="8" />
+  <arg name="frontier_size_weight" default="1.0" />
+  <arg name="frontier_max_score_distance" default="4.0" />
+  <arg name="exploration_complete_wait_sec" default="15.0" />
   <!-- 맵 설정 -->
   <!-- <arg name="world_name" default="$(find night_patrol_robot)/worlds/office_patrolv3.world" /> -->
-  <arg name="world_name" default="$(find night_patrol_robot)/worlds/office_patrol_nov3.world" />
+  <arg name="world_name" default="$(find night_patrol_robot)/worlds/office_patrolv4.world" />
   <!-- <arg name="world_name" default="$(find night_patrol_robot)/worlds/office_fire_detection_test.world" /> -->
 
   <!-- 공통: 시뮬레이터 + 로봇 -->
@@ -65,7 +81,24 @@
       <node pkg="night_patrol_robot"
             type="frontier_explore_node.py"
             name="frontier_explore_node"
-            output="screen" />
+            output="screen">
+        <param name="goal_timeout_sec" value="$(arg frontier_goal_timeout_sec)" />
+        <param name="min_goal_distance" value="$(arg frontier_min_goal_distance)" />
+        <param name="blacklist_radius" value="$(arg frontier_blacklist_radius)" />
+        <param name="blacklist_ttl_sec" value="$(arg frontier_blacklist_ttl_sec)" />
+        <param name="blacklist_max_size" value="$(arg frontier_blacklist_max_size)" />
+        <param name="frontier_clearance_cells" value="$(arg frontier_clearance_cells)" />
+        <param name="occupied_threshold" value="$(arg frontier_occupied_threshold)" />
+        <param name="information_radius_cells" value="$(arg frontier_information_radius_cells)" />
+        <param name="obstacle_penalty_radius_cells" value="$(arg frontier_obstacle_penalty_radius_cells)" />
+        <param name="information_gain_weight" value="$(arg frontier_information_gain_weight)" />
+        <param name="distance_weight" value="$(arg frontier_distance_weight)" />
+        <param name="obstacle_penalty_weight" value="$(arg frontier_obstacle_penalty_weight)" />
+        <param name="min_frontier_cluster_size" value="$(arg frontier_min_cluster_size)" />
+        <param name="frontier_size_weight" value="$(arg frontier_size_weight)" />
+        <param name="max_score_distance" value="$(arg frontier_max_score_distance)" />
+        <param name="exploration_complete_wait_sec" value="$(arg exploration_complete_wait_sec)" />
+      </node>
 
       <node pkg="night_patrol_robot"
             type="auto_map_saver_node.py"
