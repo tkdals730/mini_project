@@ -33,6 +33,12 @@ class FrontierExploreNode:
         self.blacklist_radius = rospy.get_param("~blacklist_radius", 0.3)
         # frontier 주변 여유 공간을 조금 확인해서 지나치게 벽에 붙은 goal은 피한다.
         self.frontier_clearance_cells = rospy.get_param("~frontier_clearance_cells", 2)
+        self.occupied_threshold = rospy.get_param("~occupied_threshold", 40)
+        self.information_radius_cells = rospy.get_param("~information_radius_cells", 4)
+        self.obstacle_penalty_radius_cells = rospy.get_param("~obstacle_penalty_radius_cells", 3)
+        self.information_gain_weight = rospy.get_param("~information_gain_weight", 1.0)
+        self.distance_weight = rospy.get_param("~distance_weight", 1.0)
+        self.obstacle_penalty_weight = rospy.get_param("~obstacle_penalty_weight", 0.25)
 
         rospy.Subscriber("/map", OccupancyGrid, self._map_callback)
 
@@ -69,9 +75,45 @@ class FrontierExploreNode:
         for ny in range(max(0, gy - radius), min(height, gy + radius + 1)):
             for nx in range(max(0, gx - radius), min(width, gx + radius + 1)):
                 idx = self._to_index(nx, ny, width)
-                if data[idx] > 40:
+                if data[idx] > self.occupied_threshold:
                     return False
         return True
+
+    def _count_cells_around(self, gx, gy, width, height, data, radius, predicate):
+        count = 0
+        for ny in range(max(0, gy - radius), min(height, gy + radius + 1)):
+            for nx in range(max(0, gx - radius), min(width, gx + radius + 1)):
+                idx = self._to_index(nx, ny, width)
+                if predicate(data[idx]):
+                    count += 1
+        return count
+
+    def _score_frontier(self, gx, gy, width, height, data, distance):
+        information_gain = self._count_cells_around(
+            gx,
+            gy,
+            width,
+            height,
+            data,
+            self.information_radius_cells,
+            lambda value: value == -1,
+        )
+        obstacle_penalty = self._count_cells_around(
+            gx,
+            gy,
+            width,
+            height,
+            data,
+            self.obstacle_penalty_radius_cells,
+            lambda value: value > self.occupied_threshold,
+        )
+
+        score = (
+            (self.distance_weight * distance)
+            + (self.obstacle_penalty_weight * obstacle_penalty)
+            - (self.information_gain_weight * information_gain)
+        )
+        return score, information_gain, obstacle_penalty
 
     def _find_frontier_goal(self, robot_x, robot_y):
         if self.map_msg is None:
@@ -118,17 +160,21 @@ class FrontierExploreNode:
                 if self._is_blacklisted(wx, wy):
                     continue
 
-                # 현재는 가까운 frontier를 우선 선택하는 단순 기준을 사용한다.
-                # 맵을 빠르게 넓히는 데는 충분하지만, 나중에 필요하면 정보량이나
-                # 시야 확보 정도를 점수에 추가해서 더 똑똑하게 고를 수 있다.
-                score = distance
+                score, information_gain, obstacle_penalty = self._score_frontier(
+                    gx,
+                    gy,
+                    width,
+                    height,
+                    data,
+                    distance,
+                )
                 if best_score is None or score < best_score:
                     best_score = score
-                    best_goal = (wx, wy)
+                    best_goal = (wx, wy, score, distance, information_gain, obstacle_penalty)
 
         return best_goal
 
-    def _send_goal(self, goal_x, goal_y, robot_yaw):
+    def _send_goal(self, goal_x, goal_y, robot_yaw, goal_info=None):
         goal = MoveBaseGoal()
         goal.target_pose.header.frame_id = "map"
         goal.target_pose.header.stamp = rospy.Time.now()
@@ -138,7 +184,18 @@ class FrontierExploreNode:
         self.move_base.send_goal(goal)
         self.current_goal = (goal_x, goal_y)
         self.last_goal_time = rospy.Time.now()
-        rospy.loginfo("Frontier goal sent: x=%.2f y=%.2f", goal_x, goal_y)
+        if goal_info is None:
+            rospy.loginfo("Frontier goal sent: x=%.2f y=%.2f", goal_x, goal_y)
+        else:
+            rospy.loginfo(
+                "Frontier goal sent: x=%.2f y=%.2f score=%.2f distance=%.2f information=%d obstacle_penalty=%d",
+                goal_x,
+                goal_y,
+                goal_info["score"],
+                goal_info["distance"],
+                goal_info["information_gain"],
+                goal_info["obstacle_penalty"],
+            )
 
     def _handle_goal_state(self):
         if self.current_goal is None:
@@ -184,7 +241,13 @@ class FrontierExploreNode:
                 if frontier_goal is not None:
                     # 목표 자세는 현재 로봇 heading을 대략 유지하고,
                     # 세부 접근은 move_base가 처리하도록 둔다.
-                    self._send_goal(frontier_goal[0], frontier_goal[1], robot_yaw)
+                    goal_info = {
+                        "score": frontier_goal[2],
+                        "distance": frontier_goal[3],
+                        "information_gain": frontier_goal[4],
+                        "obstacle_penalty": frontier_goal[5],
+                    }
+                    self._send_goal(frontier_goal[0], frontier_goal[1], robot_yaw, goal_info)
                 else:
                     rospy.loginfo_throttle(5.0, "No reachable frontier found right now.")
 
