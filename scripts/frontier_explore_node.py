@@ -31,6 +31,8 @@ class FrontierExploreNode:
         self.min_goal_distance = rospy.get_param("~min_goal_distance", 0.4)
         # 한 번 실패한 지점 주변은 잠시 제외해서 같은 실패를 반복하지 않게 한다.
         self.blacklist_radius = rospy.get_param("~blacklist_radius", 0.3)
+        self.blacklist_ttl = rospy.Duration(rospy.get_param("~blacklist_ttl_sec", 60.0))
+        self.blacklist_max_size = rospy.get_param("~blacklist_max_size", 30)
         # frontier 주변 여유 공간을 조금 확인해서 지나치게 벽에 붙은 goal은 피한다.
         self.frontier_clearance_cells = rospy.get_param("~frontier_clearance_cells", 2)
         self.occupied_threshold = rospy.get_param("~occupied_threshold", 40)
@@ -64,10 +66,38 @@ class FrontierExploreNode:
         return world_x, world_y
 
     def _is_blacklisted(self, wx, wy):
-        for bx, by in self.blacklist:
+        self._prune_blacklist()
+        for bx, by, _stamp in self.blacklist:
             if math.hypot(wx - bx, wy - by) <= self.blacklist_radius:
                 return True
         return False
+
+    def _prune_blacklist(self):
+        if not self.blacklist:
+            return
+
+        now = rospy.Time.now()
+        if self.blacklist_ttl.to_sec() > 0.0:
+            self.blacklist = [
+                entry for entry in self.blacklist
+                if now - entry[2] <= self.blacklist_ttl
+            ]
+
+        if self.blacklist_max_size > 0 and len(self.blacklist) > self.blacklist_max_size:
+            self.blacklist = self.blacklist[-self.blacklist_max_size:]
+
+    def _add_to_blacklist(self, goal):
+        if goal is None:
+            return
+
+        self.blacklist.append((goal[0], goal[1], rospy.Time.now()))
+        self._prune_blacklist()
+        rospy.loginfo(
+            "Frontier blacklist updated: size=%d ttl=%.1fs max_size=%d",
+            len(self.blacklist),
+            self.blacklist_ttl.to_sec(),
+            self.blacklist_max_size,
+        )
 
     def _has_free_clearance(self, gx, gy, width, height, data):
         # frontier 주변에 장애물이 너무 가까우면, move_base가 접근하기 어렵다고 보고 제외한다.
@@ -209,7 +239,7 @@ class FrontierExploreNode:
 
         if state in (GoalStatus.ABORTED, GoalStatus.REJECTED):
             rospy.logwarn("Frontier goal failed, blacklisting area.")
-            self.blacklist.append(self.current_goal)
+            self._add_to_blacklist(self.current_goal)
             self.current_goal = None
             return
 
@@ -218,7 +248,7 @@ class FrontierExploreNode:
         if rospy.Time.now() - self.last_goal_time > self.goal_timeout:
             rospy.logwarn("Frontier goal timed out, blacklisting area.")
             self.move_base.cancel_goal()
-            self.blacklist.append(self.current_goal)
+            self._add_to_blacklist(self.current_goal)
             self.current_goal = None
 
     def run(self):
