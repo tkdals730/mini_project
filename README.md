@@ -28,6 +28,8 @@ night_patrol_robot/
 
 이 프로젝트는 `launch/patrol_one_button.launch`를 기본 진입점으로 사용합니다. 기본값인 `mapping:=auto`는 저장된 맵이 없으면 맵을 생성하고, 맵이 있으면 저장 맵 기반 순찰을 실행합니다.
 
+전체 운영/검증 흐름은 `docs/workflows.md`에 정리되어 있습니다.
+
 ### 1. 빌드 및 환경 설정
 
 ```bash
@@ -118,7 +120,7 @@ roslaunch night_patrol_robot patrol_one_button.launch mapping:=false patrol_loop
 
 - `worlds/office_patrolv4.world` 기반의 최신 사무실 월드 구성이 진행 중입니다.
 - `maps/patrol_map.yaml`과 이미지 파일은 아직 생성 산출물 단계이며, `maps/`에는 기본 placeholder만 있습니다.
-- frontier 탐색은 기본 동작은 구현되어 있지만, goal 선택 기준이 가까운 frontier 우선이라 탐색 효율 개선 여지가 있습니다.
+- frontier 탐색은 cluster 단위 후보 생성, 정보량, 거리, 장애물 근접도, blacklist를 함께 반영해 goal을 선택합니다.
 - 화재 감지는 현재 Gazebo 테스트 오브젝트에 맞춘 색상 threshold 방식이며, 실제 화재 일반화 모델은 아직 아닙니다.
 
 ## 앞으로 구현해야 할 부분
@@ -127,7 +129,7 @@ roslaunch night_patrol_robot patrol_one_button.launch mapping:=false patrol_loop
 - SLAM으로 생성한 `patrol_map.yaml`과 map image를 저장하고 순찰 모드에서 검증
 - 실제 월드 구조에 맞는 waypoint 재설계 및 순찰 실패 시 복구 동작 추가
 - 화재 감지 결과를 순찰 로직과 연동해 감지 시 정지, 알림, 위치 기록을 수행하도록 개선
-- frontier goal 선택 기준에 정보량, 거리, 장애물 여유 공간을 함께 반영
+- 실제 Gazebo 시나리오에서 frontier goal 반복 실패, 벽 근접 goal, 탐색 완료 판단을 추가 검증
 - ROS launch smoke test 또는 간단한 노드 단위 테스트 추가
 - `package.xml`의 license, maintainer metadata 정리
 - README에 실행 화면, 맵 예시, 화재 감지 디버그 이미지 추가
