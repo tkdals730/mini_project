@@ -119,17 +119,20 @@ roslaunch night_patrol_robot patrol_one_button.launch mapping:=false patrol_loop
 ## 현재 진행 중인 부분
 
 - `worlds/office_patrolv4.world` 기반의 최신 사무실 월드 구성이 진행 중입니다.
-- `maps/patrol_map.yaml`과 이미지 파일은 아직 생성 산출물 단계이며, `maps/`에는 기본 placeholder만 있습니다.
+- `maps/patrol_map.yaml`과 `maps/patrol_map.pgm`은 현재 저장 맵 기반 순찰 검증에 사용할 수 있는 산출물로 갱신되어 있습니다.
 - frontier 탐색은 cluster 단위 후보 생성, 정보량, 거리, 장애물 근접도, blacklist를 함께 반영해 goal을 선택합니다.
+- 저장 맵 기반 순찰은 `map_server`, AMCL, `move_base`, 수동 waypoint 경로로 동작 확인 중입니다.
+- RViz에서 `Patrol Waypoints` marker로 `WP1`~`WP4`와 순찰 경로를 확인할 수 있습니다.
 - 화재 감지는 현재 Gazebo 테스트 오브젝트에 맞춘 색상 threshold 방식이며, 실제 화재 일반화 모델은 아직 아닙니다.
 
 ## 앞으로 구현해야 할 부분
 
 - 최신 월드 파일 이름과 launch 기본값 정리
-- SLAM으로 생성한 `patrol_map.yaml`과 map image를 저장하고 순찰 모드에서 검증
-- 실제 월드 구조에 맞는 waypoint 재설계 및 순찰 실패 시 복구 동작 추가
+- frontier goal 반복 실패, 벽 근접 goal, 탐색 완료 판단 추가 검증
+- 순찰 실패 시 복구/중단 동작 검증 및 정책 정리
+- 순찰 완료 후 home 복귀 동작 추가
+- 특정 시간 순찰 scheduler 또는 시작 트리거 추가
 - 화재 감지 결과를 순찰 로직과 연동해 감지 시 정지, 알림, 위치 기록을 수행하도록 개선
-- 실제 Gazebo 시나리오에서 frontier goal 반복 실패, 벽 근접 goal, 탐색 완료 판단을 추가 검증
 - ROS launch smoke test 또는 간단한 노드 단위 테스트 추가
 - `package.xml`의 license, maintainer metadata 정리
 - README에 실행 화면, 맵 예시, 화재 감지 디버그 이미지 추가
@@ -138,7 +141,8 @@ roslaunch night_patrol_robot patrol_one_button.launch mapping:=false patrol_loop
 
 - 기본 mapping 전략은 `mapping_strategy:=frontier`입니다.
 - 기본 월드는 `worlds/office_patrolv4.world`입니다.
-- 순찰 waypoint는 `launch/patrol_runtime.launch` 안의 `waypoints` 파라미터에서 수정합니다.
+- 순찰 waypoint는 `launch/patrol_runtime.launch` 안의 `waypoints` 파라미터에서 수정하며, 현재 저장 맵 기준 수동 waypoint가 반영되어 있습니다.
+- Gazebo spawn pose와 AMCL initial pose는 `spawn_*`, `initial_pose_*` launch arg로 분리되어 있습니다.
 - 화재 감지 디버그 이미지는 기본적으로 `/fire_detection/debug_image`에서 확인합니다.
 
 ## Frontier 탐색 파라미터
