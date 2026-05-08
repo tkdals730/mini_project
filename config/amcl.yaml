@@ -5,7 +5,7 @@ kld_z: 0.99
 update_min_d: 0.10
 update_min_a: 0.10
 resample_interval: 1
-transform_tolerance: 0.5
+transform_tolerance: 1.0
 recovery_alpha_slow: 0.0
 recovery_alpha_fast: 0.0
 laser_max_beams: 60
@@ -23,4 +23,3 @@ odom_alpha3: 0.2
 odom_alpha4: 0.2
 gui_publish_rate: 10.0
 laser_model_type: likelihood_field
-

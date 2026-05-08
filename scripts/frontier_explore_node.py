@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from collections import deque
 import math
 
 import actionlib
@@ -8,6 +9,7 @@ from actionlib_msgs.msg import GoalStatus
 from geometry_msgs.msg import Quaternion
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 from nav_msgs.msg import OccupancyGrid
+from std_msgs.msg import Bool
 from tf.transformations import quaternion_from_euler
 
 
@@ -24,21 +26,47 @@ class FrontierExploreNode:
         self.blacklist = []
         self.current_goal = None
         self.last_goal_time = rospy.Time(0)
+        self.current_robot_x = 0.0
+        self.current_robot_y = 0.0
+        self.last_frontier_seen_time = rospy.Time(0)
+        self.exploration_complete_published = False
 
         # 같은 goal에 너무 오래 묶이지 않게 해서, 막힌 구역이면 빨리 다른 frontier를 보게 한다.
         self.goal_timeout = rospy.Duration(rospy.get_param("~goal_timeout_sec", 8.0))
         # 로봇 바로 주변의 frontier는 의미 없는 미세 이동이 되기 쉬워서 최소 거리를 둔다.
         self.min_goal_distance = rospy.get_param("~min_goal_distance", 0.4)
+        # 0보다 크면 너무 먼 frontier goal은 제외해서 move_base 실패 가능성을 줄인다.
+        self.max_goal_distance = rospy.get_param("~max_goal_distance", 0.0)
         # 한 번 실패한 지점 주변은 잠시 제외해서 같은 실패를 반복하지 않게 한다.
         self.blacklist_radius = rospy.get_param("~blacklist_radius", 0.3)
+        self.blacklist_ttl = rospy.Duration(rospy.get_param("~blacklist_ttl_sec", 60.0))
+        self.blacklist_max_size = rospy.get_param("~blacklist_max_size", 30)
         # frontier 주변 여유 공간을 조금 확인해서 지나치게 벽에 붙은 goal은 피한다.
         self.frontier_clearance_cells = rospy.get_param("~frontier_clearance_cells", 2)
+        self.occupied_threshold = rospy.get_param("~occupied_threshold", 40)
+        # 너무 작은 frontier는 문틈 노이즈나 벽 가장자리일 가능성이 높아서 제외한다.
+        self.min_frontier_cluster_size = rospy.get_param("~min_frontier_cluster_size", 8)
+        # 넓고 정보량이 큰 frontier를 선호하되, 먼 goal과 장애물 근접 후보는 감점한다.
+        self.frontier_size_weight = rospy.get_param("~frontier_size_weight", 1.0)
+        self.information_radius_cells = rospy.get_param("~information_radius_cells", 4)
+        self.obstacle_penalty_radius_cells = rospy.get_param("~obstacle_penalty_radius_cells", 3)
+        self.information_gain_weight = rospy.get_param("~information_gain_weight", 1.0)
+        self.distance_weight = rospy.get_param("~distance_weight", 0.25)
+        self.obstacle_penalty_weight = rospy.get_param("~obstacle_penalty_weight", 0.25)
+        self.max_score_distance = rospy.get_param("~max_score_distance", 4.0)
+        self.exploration_complete_wait = rospy.Duration(
+            rospy.get_param("~exploration_complete_wait_sec", 15.0)
+        )
 
+        self.exploration_complete_pub = rospy.Publisher(
+            "/exploration_complete", Bool, queue_size=1, latch=True
+        )
         rospy.Subscriber("/map", OccupancyGrid, self._map_callback)
 
         rospy.loginfo("Waiting for move_base action server for frontier exploration...")
         if not self.move_base.wait_for_server(rospy.Duration(20.0)):
             raise rospy.ROSInitException("move_base action server is not available")
+        self.last_frontier_seen_time = rospy.Time.now()
 
     def _map_callback(self, msg):
         self.map_msg = msg
@@ -58,10 +86,38 @@ class FrontierExploreNode:
         return world_x, world_y
 
     def _is_blacklisted(self, wx, wy):
-        for bx, by in self.blacklist:
+        self._prune_blacklist()
+        for bx, by, _stamp in self.blacklist:
             if math.hypot(wx - bx, wy - by) <= self.blacklist_radius:
                 return True
         return False
+
+    def _prune_blacklist(self):
+        if not self.blacklist:
+            return
+
+        now = rospy.Time.now()
+        if self.blacklist_ttl.to_sec() > 0.0:
+            self.blacklist = [
+                entry for entry in self.blacklist
+                if now - entry[2] <= self.blacklist_ttl
+            ]
+
+        if self.blacklist_max_size > 0 and len(self.blacklist) > self.blacklist_max_size:
+            self.blacklist = self.blacklist[-self.blacklist_max_size:]
+
+    def _add_to_blacklist(self, goal):
+        if goal is None:
+            return
+
+        self.blacklist.append((goal[0], goal[1], rospy.Time.now()))
+        self._prune_blacklist()
+        rospy.loginfo(
+            "Frontier blacklist updated: size=%d ttl=%.1fs max_size=%d",
+            len(self.blacklist),
+            self.blacklist_ttl.to_sec(),
+            self.blacklist_max_size,
+        )
 
     def _has_free_clearance(self, gx, gy, width, height, data):
         # frontier 주변에 장애물이 너무 가까우면, move_base가 접근하기 어렵다고 보고 제외한다.
@@ -69,9 +125,120 @@ class FrontierExploreNode:
         for ny in range(max(0, gy - radius), min(height, gy + radius + 1)):
             for nx in range(max(0, gx - radius), min(width, gx + radius + 1)):
                 idx = self._to_index(nx, ny, width)
-                if data[idx] > 40:
+                if data[idx] > self.occupied_threshold:
                     return False
         return True
+
+    def _count_cells_around(self, gx, gy, width, height, data, radius, predicate):
+        count = 0
+        for ny in range(max(0, gy - radius), min(height, gy + radius + 1)):
+            for nx in range(max(0, gx - radius), min(width, gx + radius + 1)):
+                idx = self._to_index(nx, ny, width)
+                if predicate(data[idx]):
+                    count += 1
+        return count
+
+    def _is_frontier_cell(self, gx, gy, width, data):
+        idx = self._to_index(gx, gy, width)
+        if data[idx] != 0:
+            return False
+
+        for ny in range(gy - 1, gy + 2):
+            for nx in range(gx - 1, gx + 2):
+                if nx == gx and ny == gy:
+                    continue
+                nidx = self._to_index(nx, ny, width)
+                if data[nidx] == -1:
+                    return True
+        return False
+
+    def _build_frontier_clusters(self, width, height, data):
+        frontier_cells = set()
+        for gy in range(1, height - 1):
+            for gx in range(1, width - 1):
+                if self._is_frontier_cell(gx, gy, width, data):
+                    frontier_cells.add((gx, gy))
+
+        clusters = []
+        visited = set()
+        for start in frontier_cells:
+            if start in visited:
+                continue
+
+            queue = deque([start])
+            visited.add(start)
+            cluster = []
+
+            while queue:
+                gx, gy = queue.popleft()
+                cluster.append((gx, gy))
+
+                for ny in range(gy - 1, gy + 2):
+                    for nx in range(gx - 1, gx + 2):
+                        neighbor = (nx, ny)
+                        if neighbor in visited or neighbor not in frontier_cells:
+                            continue
+                        visited.add(neighbor)
+                        queue.append(neighbor)
+
+            if len(cluster) >= self.min_frontier_cluster_size:
+                clusters.append(cluster)
+
+        return clusters
+
+    def _pick_cluster_goal(self, cluster, width, height, data, origin_x, origin_y, resolution):
+        center_x = sum(gx for gx, _ in cluster) / float(len(cluster))
+        center_y = sum(gy for _, gy in cluster) / float(len(cluster))
+
+        best_cell = None
+        best_distance = None
+        for gx, gy in cluster:
+            if not self._has_free_clearance(gx, gy, width, height, data):
+                continue
+            wx, wy = self._grid_to_world(gx, gy, origin_x, origin_y, resolution)
+            if self._is_blacklisted(wx, wy):
+                continue
+
+            distance = math.hypot(gx - center_x, gy - center_y)
+            if best_distance is None or distance < best_distance:
+                best_distance = distance
+                best_cell = (gx, gy)
+
+        if best_cell is None:
+            return None
+
+        wx, wy = self._grid_to_world(best_cell[0], best_cell[1], origin_x, origin_y, resolution)
+        return wx, wy, best_cell[0], best_cell[1]
+
+    def _score_frontier(self, gx, gy, width, height, data, distance, cluster_size, resolution):
+        information_gain = self._count_cells_around(
+            gx,
+            gy,
+            width,
+            height,
+            data,
+            self.information_radius_cells,
+            lambda value: value == -1,
+        )
+        obstacle_penalty = self._count_cells_around(
+            gx,
+            gy,
+            width,
+            height,
+            data,
+            self.obstacle_penalty_radius_cells,
+            lambda value: value > self.occupied_threshold,
+        )
+
+        cluster_width = cluster_size * resolution
+        distance_score = min(distance, self.max_score_distance)
+        score = (
+            (self.frontier_size_weight * cluster_width)
+            + (self.information_gain_weight * information_gain)
+            - (self.distance_weight * distance_score)
+            - (self.obstacle_penalty_weight * obstacle_penalty)
+        )
+        return score, information_gain, obstacle_penalty
 
     def _find_frontier_goal(self, robot_x, robot_y):
         if self.map_msg is None:
@@ -86,59 +253,93 @@ class FrontierExploreNode:
 
         best_goal = None
         best_score = None
+        clusters = self._build_frontier_clusters(width, height, data)
 
-        for gy in range(1, height - 1):
-            for gx in range(1, width - 1):
-                idx = self._to_index(gx, gy, width)
-                if data[idx] != 0:
-                    continue
+        for cluster in clusters:
+            goal = self._pick_cluster_goal(cluster, width, height, data, origin_x, origin_y, resolution)
+            if goal is None:
+                continue
 
-                # frontier는 미탐색 셀(-1)과 맞닿아 있는 자유 공간 셀(0)로 본다.
-                has_unknown_neighbor = False
-                for ny in range(gy - 1, gy + 2):
-                    for nx in range(gx - 1, gx + 2):
-                        nidx = self._to_index(nx, ny, width)
-                        if data[nidx] == -1:
-                            has_unknown_neighbor = True
-                            break
-                    if has_unknown_neighbor:
-                        break
+            wx, wy, gx, gy = goal
+            distance = math.hypot(wx - robot_x, wy - robot_y)
+            if distance < self.min_goal_distance:
+                continue
+            if self.max_goal_distance > 0.0 and distance > self.max_goal_distance:
+                continue
 
-                if not has_unknown_neighbor:
-                    continue
+            score, information_gain, obstacle_penalty = self._score_frontier(
+                gx,
+                gy,
+                width,
+                height,
+                data,
+                distance,
+                len(cluster),
+                resolution,
+            )
+            if best_score is None or score > best_score:
+                best_score = score
+                best_goal = (
+                    wx,
+                    wy,
+                    score,
+                    distance,
+                    information_gain,
+                    obstacle_penalty,
+                    len(cluster),
+                )
 
-                if not self._has_free_clearance(gx, gy, width, height, data):
-                    continue
-
-                wx, wy = self._grid_to_world(gx, gy, origin_x, origin_y, resolution)
-                distance = math.hypot(wx - robot_x, wy - robot_y)
-                if distance < self.min_goal_distance:
-                    continue
-
-                if self._is_blacklisted(wx, wy):
-                    continue
-
-                # 현재는 가까운 frontier를 우선 선택하는 단순 기준을 사용한다.
-                # 맵을 빠르게 넓히는 데는 충분하지만, 나중에 필요하면 정보량이나
-                # 시야 확보 정도를 점수에 추가해서 더 똑똑하게 고를 수 있다.
-                score = distance
-                if best_score is None or score < best_score:
-                    best_score = score
-                    best_goal = (wx, wy)
+        rospy.loginfo_throttle(
+            5.0,
+            "Frontier candidates: clusters=%d selected=%s",
+            len(clusters),
+            "yes" if best_goal is not None else "no",
+        )
 
         return best_goal
 
-    def _send_goal(self, goal_x, goal_y, robot_yaw):
+    def _send_goal(self, goal_x, goal_y, robot_yaw, goal_info=None):
         goal = MoveBaseGoal()
         goal.target_pose.header.frame_id = "map"
         goal.target_pose.header.stamp = rospy.Time.now()
         goal.target_pose.pose.position.x = goal_x
         goal.target_pose.pose.position.y = goal_y
-        goal.target_pose.pose.orientation = yaw_to_quaternion(robot_yaw)
+        goal_yaw = math.atan2(goal_y - self.current_robot_y, goal_x - self.current_robot_x)
+        goal.target_pose.pose.orientation = yaw_to_quaternion(goal_yaw)
         self.move_base.send_goal(goal)
         self.current_goal = (goal_x, goal_y)
         self.last_goal_time = rospy.Time.now()
-        rospy.loginfo("Frontier goal sent: x=%.2f y=%.2f", goal_x, goal_y)
+        if goal_info is None:
+            rospy.loginfo("Frontier goal sent: x=%.2f y=%.2f", goal_x, goal_y)
+        else:
+            rospy.loginfo(
+                "Frontier goal sent: x=%.2f y=%.2f score=%.2f distance=%.2f information=%d obstacle_penalty=%d cluster_size=%d",
+                goal_x,
+                goal_y,
+                goal_info["score"],
+                goal_info["distance"],
+                goal_info["information_gain"],
+                goal_info["obstacle_penalty"],
+                goal_info["cluster_size"],
+            )
+
+    def _mark_frontier_seen(self):
+        self.last_frontier_seen_time = rospy.Time.now()
+        if self.exploration_complete_published:
+            self.exploration_complete_pub.publish(Bool(data=False))
+            self.exploration_complete_published = False
+
+    def _maybe_publish_exploration_complete(self):
+        if self.exploration_complete_published:
+            return
+
+        if rospy.Time.now() - self.last_frontier_seen_time < self.exploration_complete_wait:
+            return
+
+        rospy.loginfo("Exploration complete: no reachable frontier for %.1f sec.",
+                      self.exploration_complete_wait.to_sec())
+        self.exploration_complete_pub.publish(Bool(data=True))
+        self.exploration_complete_published = True
 
     def _handle_goal_state(self):
         if self.current_goal is None:
@@ -152,7 +353,7 @@ class FrontierExploreNode:
 
         if state in (GoalStatus.ABORTED, GoalStatus.REJECTED):
             rospy.logwarn("Frontier goal failed, blacklisting area.")
-            self.blacklist.append(self.current_goal)
+            self._add_to_blacklist(self.current_goal)
             self.current_goal = None
             return
 
@@ -161,7 +362,7 @@ class FrontierExploreNode:
         if rospy.Time.now() - self.last_goal_time > self.goal_timeout:
             rospy.logwarn("Frontier goal timed out, blacklisting area.")
             self.move_base.cancel_goal()
-            self.blacklist.append(self.current_goal)
+            self._add_to_blacklist(self.current_goal)
             self.current_goal = None
 
     def run(self):
@@ -176,17 +377,26 @@ class FrontierExploreNode:
             except (tf.Exception, tf.LookupException, tf.ConnectivityException):
                 rate.sleep()
                 continue
+            self.current_robot_x = robot_x
+            self.current_robot_y = robot_y
 
             self._handle_goal_state()
 
             if self.current_goal is None:
                 frontier_goal = self._find_frontier_goal(robot_x, robot_y)
                 if frontier_goal is not None:
-                    # 목표 자세는 현재 로봇 heading을 대략 유지하고,
-                    # 세부 접근은 move_base가 처리하도록 둔다.
-                    self._send_goal(frontier_goal[0], frontier_goal[1], robot_yaw)
+                    self._mark_frontier_seen()
+                    goal_info = {
+                        "score": frontier_goal[2],
+                        "distance": frontier_goal[3],
+                        "information_gain": frontier_goal[4],
+                        "obstacle_penalty": frontier_goal[5],
+                        "cluster_size": frontier_goal[6],
+                    }
+                    self._send_goal(frontier_goal[0], frontier_goal[1], robot_yaw, goal_info)
                 else:
                     rospy.loginfo_throttle(5.0, "No reachable frontier found right now.")
+                    self._maybe_publish_exploration_complete()
 
             rate.sleep()
 

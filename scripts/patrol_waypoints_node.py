@@ -3,9 +3,10 @@
 import actionlib
 import rospy
 from actionlib_msgs.msg import GoalStatus
-from geometry_msgs.msg import PoseWithCovarianceStamped, Quaternion
+from geometry_msgs.msg import Point, PoseWithCovarianceStamped, Quaternion
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 from tf.transformations import quaternion_from_euler
+from visualization_msgs.msg import Marker, MarkerArray
 
 
 def quaternion_from_yaw(yaw):
@@ -17,6 +18,9 @@ class PatrolWaypointsNode:
     def __init__(self):
         self.client = actionlib.SimpleActionClient("move_base", MoveBaseAction)
         self.initial_pose_received = False
+        self.marker_pub = rospy.Publisher(
+            "/patrol_waypoints/markers", MarkerArray, queue_size=1, latch=True
+        )
 
         rospy.Subscriber("/amcl_pose", PoseWithCovarianceStamped, self._amcl_pose_callback)
 
@@ -29,6 +33,8 @@ class PatrolWaypointsNode:
         if not self.waypoints:
             rospy.logerr("No waypoints configured. Set ~waypoints before starting patrol.")
             raise rospy.ROSInitException("waypoints parameter is empty")
+
+        self._publish_waypoint_markers()
 
         rospy.loginfo("Waiting for move_base action server...")
         if not self.client.wait_for_server(rospy.Duration(20.0)):
@@ -53,6 +59,73 @@ class PatrolWaypointsNode:
         goal.target_pose.pose.position.y = waypoint.get("y", 0.0)
         goal.target_pose.pose.orientation = quaternion_from_yaw(waypoint.get("yaw", 0.0))
         return goal
+
+    def _publish_waypoint_markers(self):
+        markers = MarkerArray()
+        stamp = rospy.Time.now()
+
+        route = Marker()
+        route.header.frame_id = "map"
+        route.header.stamp = stamp
+        route.ns = "patrol_route"
+        route.id = 0
+        route.type = Marker.LINE_STRIP
+        route.action = Marker.ADD
+        route.pose.orientation.w = 1.0
+        route.scale.x = 0.04
+        route.color.r = 0.1
+        route.color.g = 0.45
+        route.color.b = 1.0
+        route.color.a = 0.9
+
+        for index, waypoint in enumerate(self.waypoints, start=1):
+            x = waypoint.get("x", 0.0)
+            y = waypoint.get("y", 0.0)
+            route.points.append(Point(x=x, y=y, z=0.03))
+
+            sphere = Marker()
+            sphere.header.frame_id = "map"
+            sphere.header.stamp = stamp
+            sphere.ns = "patrol_waypoints"
+            sphere.id = index
+            sphere.type = Marker.SPHERE
+            sphere.action = Marker.ADD
+            sphere.pose.position.x = x
+            sphere.pose.position.y = y
+            sphere.pose.position.z = 0.08
+            sphere.pose.orientation.w = 1.0
+            sphere.scale.x = 0.28
+            sphere.scale.y = 0.28
+            sphere.scale.z = 0.08
+            sphere.color.r = 0.05
+            sphere.color.g = 0.8
+            sphere.color.b = 0.35
+            sphere.color.a = 0.95
+            markers.markers.append(sphere)
+
+            label = Marker()
+            label.header.frame_id = "map"
+            label.header.stamp = stamp
+            label.ns = "patrol_waypoint_labels"
+            label.id = index
+            label.type = Marker.TEXT_VIEW_FACING
+            label.action = Marker.ADD
+            label.pose.position.x = x
+            label.pose.position.y = y
+            label.pose.position.z = 0.35
+            label.pose.orientation.w = 1.0
+            label.scale.z = 0.28
+            label.color.r = 1.0
+            label.color.g = 1.0
+            label.color.b = 1.0
+            label.color.a = 1.0
+            label.text = "WP%d" % index
+            markers.markers.append(label)
+
+        if self.loop_enabled and route.points:
+            route.points.append(route.points[0])
+        markers.markers.append(route)
+        self.marker_pub.publish(markers)
 
     def run(self):
         waypoint_count = len(self.waypoints)
