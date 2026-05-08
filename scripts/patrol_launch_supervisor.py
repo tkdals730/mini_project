@@ -71,6 +71,13 @@ class PatrolLaunchSupervisor:
             "frontier_size_weight",
             "frontier_max_score_distance",
             "exploration_complete_wait_sec",
+            "spawn_x",
+            "spawn_y",
+            "spawn_z",
+            "spawn_yaw",
+            "initial_pose_x",
+            "initial_pose_y",
+            "initial_pose_yaw",
         ]
         cli_args = ["mapping:=%s" % self.mapping_value]
         cli_args.extend("%s:=%s" % (name, _param_as_launch_value(name)) for name in arg_names)

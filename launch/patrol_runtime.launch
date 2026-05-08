@@ -31,6 +31,13 @@
   <arg name="frontier_size_weight" default="1.0" />
   <arg name="frontier_max_score_distance" default="4.0" />
   <arg name="exploration_complete_wait_sec" default="15.0" />
+  <arg name="spawn_x" default="0.0" />
+  <arg name="spawn_y" default="0.0" />
+  <arg name="spawn_z" default="0.01" />
+  <arg name="spawn_yaw" default="0.0" />
+  <arg name="initial_pose_x" default="0.0" />
+  <arg name="initial_pose_y" default="0.0" />
+  <arg name="initial_pose_yaw" default="0.0" />
   <!-- 맵 설정 -->
   <!-- <arg name="world_name" default="$(find night_patrol_robot)/worlds/office_patrolv3.world" /> -->
   <arg name="world_name" default="$(find night_patrol_robot)/worlds/office_patrolv4.world" />
@@ -39,6 +46,10 @@
   <!-- 공통: 시뮬레이터 + 로봇 -->
   <include file="$(find night_patrol_robot)/launch/gazebo_robot.launch">
     <arg name="world_name" value="$(arg world_name)" />
+    <arg name="spawn_x" value="$(arg spawn_x)" />
+    <arg name="spawn_y" value="$(arg spawn_y)" />
+    <arg name="spawn_z" value="$(arg spawn_z)" />
+    <arg name="spawn_yaw" value="$(arg spawn_yaw)" />
   </include>
 
   <node if="$(arg use_rviz)"
@@ -122,8 +133,12 @@
   <group unless="$(arg mapping)">
     <node pkg="map_server" type="map_server" name="map_server" args="$(arg map_file)" />
 
-    <rosparam command="load" file="$(find night_patrol_robot)/config/amcl.yaml" />
-    <node pkg="amcl" type="amcl" name="amcl" output="screen" />
+    <rosparam command="load" file="$(find night_patrol_robot)/config/amcl.yaml" ns="amcl" />
+    <node pkg="amcl" type="amcl" name="amcl" output="screen">
+      <param name="initial_pose_x" value="$(arg initial_pose_x)" />
+      <param name="initial_pose_y" value="$(arg initial_pose_y)" />
+      <param name="initial_pose_a" value="$(arg initial_pose_yaw)" />
+    </node>
 
     <rosparam command="load" file="$(find night_patrol_robot)/config/costmap_common.yaml" ns="move_base/global_costmap" />
     <rosparam command="load" file="$(find night_patrol_robot)/config/costmap_common.yaml" ns="move_base/local_costmap" />
@@ -139,10 +154,10 @@
       <param name="patrol_loop" value="$(arg patrol_loop)" />
       <param name="wait_after_goal_sec" value="$(arg patrol_wait_sec)" />
       <rosparam param="waypoints">
-        - {x: 0.0, y: 0.0, yaw: 0.0, wait_sec: 3.0}
-        - {x: 1.8, y: 0.0, yaw: 0.0, wait_sec: 5.0}
-        - {x: 1.8, y: 1.6, yaw: 1.57, wait_sec: 5.0}
-        - {x: 0.2, y: 1.6, yaw: 3.14, wait_sec: 5.0}
+        - {x: -1.00, y: 5.04, yaw: 1.01, wait_sec: 3.0}
+        - {x: 0.48, y: 7.42, yaw: -1.23, wait_sec: 5.0}
+        - {x: 1.29, y: 5.08, yaw: -1.56, wait_sec: 5.0}
+        - {x: 1.32, y: 2.29, yaw: 2.30, wait_sec: 5.0}
       </rosparam>
     </node>
   </group>

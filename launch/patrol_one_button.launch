@@ -36,6 +36,13 @@
   <arg name="frontier_size_weight" default="1.0" />
   <arg name="frontier_max_score_distance" default="4.0" />
   <arg name="exploration_complete_wait_sec" default="15.0" />
+  <arg name="spawn_x" default="0.0" />
+  <arg name="spawn_y" default="0.0" />
+  <arg name="spawn_z" default="0.01" />
+  <arg name="spawn_yaw" default="0.0" />
+  <arg name="initial_pose_x" default="0.0" />
+  <arg name="initial_pose_y" default="0.0" />
+  <arg name="initial_pose_yaw" default="0.0" />
 
   <node pkg="night_patrol_robot"
         type="patrol_launch_supervisor.py"
@@ -71,5 +78,12 @@
     <param name="frontier_size_weight" value="$(arg frontier_size_weight)" />
     <param name="frontier_max_score_distance" value="$(arg frontier_max_score_distance)" />
     <param name="exploration_complete_wait_sec" value="$(arg exploration_complete_wait_sec)" />
+    <param name="spawn_x" value="$(arg spawn_x)" />
+    <param name="spawn_y" value="$(arg spawn_y)" />
+    <param name="spawn_z" value="$(arg spawn_z)" />
+    <param name="spawn_yaw" value="$(arg spawn_yaw)" />
+    <param name="initial_pose_x" value="$(arg initial_pose_x)" />
+    <param name="initial_pose_y" value="$(arg initial_pose_y)" />
+    <param name="initial_pose_yaw" value="$(arg initial_pose_yaw)" />
   </node>
 </launch>
