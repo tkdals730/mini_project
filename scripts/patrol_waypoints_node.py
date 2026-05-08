@@ -25,14 +25,20 @@ class PatrolWaypointsNode:
         rospy.Subscriber("/amcl_pose", PoseWithCovarianceStamped, self._amcl_pose_callback)
 
         self.loop_enabled = rospy.get_param("~patrol_loop", True)
+        self.return_home_enabled = rospy.get_param("~return_home", True)
         self.wait_after_goal_sec = rospy.get_param("~wait_after_goal_sec", 5.0)
         # 위치 초기화 직후 goal을 보내면 경로가 흔들릴 수 있어서 대기 시간을 둔다.
         self.initial_wait_sec = rospy.get_param("~initial_wait_sec", 2.0)
         self.waypoints = rospy.get_param("~waypoints", [])
+        self.home_approach_waypoint = rospy.get_param("~home_approach_waypoint", {})
+        self.home_waypoint = rospy.get_param("~home_waypoint", {})
 
         if not self.waypoints:
             rospy.logerr("No waypoints configured. Set ~waypoints before starting patrol.")
             raise rospy.ROSInitException("waypoints parameter is empty")
+
+        if self.return_home_enabled and not self._has_home_waypoint():
+            rospy.logwarn("~return_home is enabled but ~home_waypoint is empty. Skipping home return.")
 
         self._publish_waypoint_markers()
 
@@ -60,6 +66,12 @@ class PatrolWaypointsNode:
         goal.target_pose.pose.orientation = quaternion_from_yaw(waypoint.get("yaw", 0.0))
         return goal
 
+    def _has_home_waypoint(self):
+        return isinstance(self.home_waypoint, dict) and bool(self.home_waypoint)
+
+    def _has_home_approach_waypoint(self):
+        return isinstance(self.home_approach_waypoint, dict) and bool(self.home_approach_waypoint)
+
     def _publish_waypoint_markers(self):
         markers = MarkerArray()
         stamp = rospy.Time.now()
@@ -78,15 +90,34 @@ class PatrolWaypointsNode:
         route.color.b = 1.0
         route.color.a = 0.9
 
-        for index, waypoint in enumerate(self.waypoints, start=1):
+        display_waypoints = list(self.waypoints)
+        has_home_return = self.return_home_enabled and self._has_home_waypoint()
+        has_home_approach = has_home_return and self._has_home_approach_waypoint()
+        home_approach_index = None
+        home_index = None
+        if has_home_return:
+            if has_home_approach:
+                display_waypoints.append(self.home_approach_waypoint)
+                home_approach_index = len(display_waypoints)
+            display_waypoints.append(self.home_waypoint)
+            home_index = len(display_waypoints)
+
+        for index, waypoint in enumerate(display_waypoints, start=1):
             x = waypoint.get("x", 0.0)
             y = waypoint.get("y", 0.0)
             route.points.append(Point(x=x, y=y, z=0.03))
+            is_home_approach = has_home_approach and index == home_approach_index
+            is_home = has_home_return and index == home_index
 
             sphere = Marker()
             sphere.header.frame_id = "map"
             sphere.header.stamp = stamp
-            sphere.ns = "patrol_waypoints"
+            if is_home:
+                sphere.ns = "patrol_home"
+            elif is_home_approach:
+                sphere.ns = "patrol_home_entry"
+            else:
+                sphere.ns = "patrol_waypoints"
             sphere.id = index
             sphere.type = Marker.SPHERE
             sphere.action = Marker.ADD
@@ -97,35 +128,64 @@ class PatrolWaypointsNode:
             sphere.scale.x = 0.28
             sphere.scale.y = 0.28
             sphere.scale.z = 0.08
-            sphere.color.r = 0.05
-            sphere.color.g = 0.8
-            sphere.color.b = 0.35
+            sphere.color.r = 1.0 if is_home else 0.05
+            sphere.color.g = 0.55 if is_home_approach else 0.8
+            sphere.color.b = 0.05 if is_home else 0.35
             sphere.color.a = 0.95
             markers.markers.append(sphere)
 
             label = Marker()
             label.header.frame_id = "map"
             label.header.stamp = stamp
-            label.ns = "patrol_waypoint_labels"
+            if is_home:
+                label.ns = "patrol_home_label"
+            elif is_home_approach:
+                label.ns = "patrol_home_entry_label"
+            else:
+                label.ns = "patrol_waypoint_labels"
             label.id = index
             label.type = Marker.TEXT_VIEW_FACING
             label.action = Marker.ADD
             label.pose.position.x = x
             label.pose.position.y = y
-            label.pose.position.z = 0.35
+            label.pose.position.z = 0.55 if is_home else 0.35
             label.pose.orientation.w = 1.0
-            label.scale.z = 0.28
+            label.scale.z = 0.24 if is_home else 0.28
             label.color.r = 1.0
             label.color.g = 1.0
             label.color.b = 1.0
             label.color.a = 1.0
-            label.text = "WP%d" % index
+            if is_home:
+                label.text = "HOME"
+            elif is_home_approach:
+                label.text = "ENTRY"
+            else:
+                label.text = "WP%d" % index
             markers.markers.append(label)
 
-        if self.loop_enabled and route.points:
+        if self.loop_enabled and route.points and not has_home_return:
             route.points.append(route.points[0])
         markers.markers.append(route)
         self.marker_pub.publish(markers)
+
+    def _send_goal_and_wait(self, waypoint, label):
+        goal = self._build_goal(waypoint)
+        rospy.loginfo(
+            "Sending %s: x=%.2f y=%.2f yaw=%.2f",
+            label,
+            waypoint.get("x", 0.0),
+            waypoint.get("y", 0.0),
+            waypoint.get("yaw", 0.0),
+        )
+        self.client.send_goal(goal)
+        self.client.wait_for_result()
+        return self.client.get_state()
+
+    def _wait_at_waypoint(self, waypoint, label):
+        wait_sec = waypoint.get("wait_sec", self.wait_after_goal_sec)
+        if wait_sec > 0.0:
+            rospy.loginfo("%s reached. Waiting %.1f seconds for inspection.", label, wait_sec)
+            rospy.sleep(wait_sec)
 
     def run(self):
         waypoint_count = len(self.waypoints)
@@ -136,18 +196,8 @@ class PatrolWaypointsNode:
             rospy.loginfo("Starting patrol cycle %d with %d waypoints.", cycle_index, waypoint_count)
 
             for index, waypoint in enumerate(self.waypoints, start=1):
-                goal = self._build_goal(waypoint)
-                rospy.loginfo(
-                    "Sending waypoint %d/%d: x=%.2f y=%.2f yaw=%.2f",
-                    index,
-                    waypoint_count,
-                    waypoint.get("x", 0.0),
-                    waypoint.get("y", 0.0),
-                    waypoint.get("yaw", 0.0),
-                )
-                self.client.send_goal(goal)
-                self.client.wait_for_result()
-                state = self.client.get_state()
+                label = "waypoint %d/%d" % (index, waypoint_count)
+                state = self._send_goal_and_wait(waypoint, label)
 
                 # 순찰 루프를 단순하게 유지하기 위해, goal 하나가 실패하면
                 # 복잡한 복구 로직 대신 다음 사이클에서 다시 시도한다.
@@ -155,12 +205,25 @@ class PatrolWaypointsNode:
                     rospy.logwarn("Waypoint %d failed with state %d. Retrying on next cycle.", index, state)
                     break
 
-                wait_sec = waypoint.get("wait_sec", self.wait_after_goal_sec)
-                if wait_sec > 0.0:
-                    rospy.loginfo("Waypoint %d reached. Waiting %.1f seconds for inspection.", index, wait_sec)
-                    rospy.sleep(wait_sec)
+                self._wait_at_waypoint(waypoint, "Waypoint %d" % index)
             else:
                 rospy.loginfo("Patrol cycle %d completed.", cycle_index)
+                if self.return_home_enabled and self._has_home_waypoint():
+                    if self._has_home_approach_waypoint():
+                        state = self._send_goal_and_wait(
+                            self.home_approach_waypoint, "home entry waypoint"
+                        )
+                        if state != GoalStatus.SUCCEEDED:
+                            rospy.logwarn("Home entry failed with state %d.", state)
+                            continue
+                        self._wait_at_waypoint(self.home_approach_waypoint, "Home entry")
+
+                    state = self._send_goal_and_wait(self.home_waypoint, "home waypoint")
+                    if state == GoalStatus.SUCCEEDED:
+                        self._wait_at_waypoint(self.home_waypoint, "Home waypoint")
+                        rospy.loginfo("Home return completed after patrol cycle %d.", cycle_index)
+                    else:
+                        rospy.logwarn("Home return failed with state %d.", state)
 
             if not self.loop_enabled:
                 rospy.loginfo("Patrol loop disabled, stopping after one cycle.")

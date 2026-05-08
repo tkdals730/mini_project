@@ -8,11 +8,11 @@
 
 | 순서 | 단계 | 현재 상태 | 다음에 할 일 |
 | --- | --- | --- | --- |
-| 1 | 초기 맵핑 | 대부분 확인 | frontier goal 품질과 막힌 goal 반복 방지 추가 확인 |
-| 2 | 맵 저장 | 완료 | 저장 맵을 순찰 검증 기준 산출물로 유지 |
+| 1 | 초기 맵핑 | 부분 완료 | `office_patrol_nov4.world` 상단 끝 반복 실패 frontier 완료 처리 재검증 |
+| 2 | 맵 저장 | 완료 | 자동 저장 후 home 복귀까지 이어지는지 확인 |
 | 3 | 저장 맵 기반 순찰 | 부분 완료 | 순찰 실패 시 복구/중단 동작 확인 |
 | 4 | 특정 시간 순찰 | 미구현 | scheduler 노드 또는 시작 트리거 방식 결정 |
-| 5 | 원래 자리 복귀 | 미구현 | home waypoint 정의와 복귀 동작 추가 |
+| 5 | 원래 자리 복귀 | 부분 구현 | home 복귀 성공/실패 정책 검증 |
 | 6 | 화재 감지 | 기본 감지 구현 | 감지 후 경보, 정지, 알림 정책 결정 |
 | 7 | 원버튼 자동 실행 | 부분 구현 | `mapping:=auto` 전체 흐름을 처음부터 끝까지 검증 |
 
@@ -24,7 +24,7 @@
   - [x] `move_base` goal 처리 확인
   - [x] RViz에서 맵 확장 안정성 확인
   - [ ] 벽/장애물 내부 goal 미생성 확인
-  - [ ] 막힌 goal 반복 선택 방지 확인
+  - [ ] 막힌 goal 반복 선택 방지 및 완료 전환 확인
 - [x] 2. 맵 저장 완료
   - [x] 저장 명령/노드 구성 확인
   - [x] `maps/patrol_map.yaml` 최종 저장 확인
@@ -42,8 +42,9 @@
   - [ ] 순찰 시간 도달 시 자동 출발 확인
   - [ ] 다음 순찰 시간까지 대기 확인
 - [ ] 5. 원래 자리 복귀 완료
-  - [ ] home 위치 정의
-  - [ ] 순찰 완료 후 home 복귀 구현
+  - [x] home 위치 정의
+  - [x] 순찰 완료 후 home 복귀 구현
+  - [x] 맵 저장 후 home 복귀 구현
   - [ ] home 복귀 성공 확인
 - [ ] 6. 화재 감지 완료
   - [x] 카메라 토픽 확인
@@ -59,8 +60,8 @@
 
 ### 현재 우선순위
 
-1. 순찰 실패 시 복구/중단 동작을 확인한다.
-2. 순찰 완료 후 home 복귀 방식을 설계한다.
+1. `office_patrol_nov4.world`에서 초기 맵핑 완료 전환과 자동 저장/home 복귀를 재검증한다.
+2. 순찰 실패 시 복구/중단 동작을 확인한다.
 3. 특정 시간 순찰 scheduler 또는 시작 트리거 방식을 결정한다.
 4. 화재 감지 후 대응 방식을 결정한다.
 5. 원버튼 자동 실행 전체 시나리오를 검증한다.
@@ -124,7 +125,7 @@ roslaunch night_patrol_robot patrol_one_button.launch mapping:=true use_rviz:=fa
 
 ### 자동 저장
 
-frontier 탐색이 완료되면 `auto_map_saver_node.py`가 `maps/patrol_map`으로 저장하는 흐름을 목표로 한다.
+frontier 탐색이 완료되면 `auto_map_saver_node.py`가 `maps/patrol_map`으로 저장하고 home waypoint로 복귀한다. 현재 구현은 `/exploration_complete`를 수신하면 맵을 저장한 뒤 `home_approach_waypoint`, `home_waypoint` 순서로 `move_base` goal을 보낸다.
 
 ### 수동 저장
 
@@ -205,7 +206,30 @@ roslaunch night_patrol_robot patrol_one_button.launch mapping:=false
 - 순찰 완료 후 원래 자리 또는 home waypoint로 돌아오는지 확인
 - 다음 순찰 시간까지 다시 대기하는지 확인
 
-## Workflow 5. 화재 감지
+## Workflow 5. Home 복귀
+
+### 목적
+
+초기 맵핑/맵 저장 또는 저장 맵 기반 순찰이 끝난 뒤 로봇을 시작 위치 근처의 home waypoint로 돌려보낸다.
+
+### 현재 구현
+
+- `auto_map_saver_node.py`는 맵 저장 후 `home_approach_waypoint`, `home_waypoint` 순서로 복귀 goal을 보낸다.
+- `patrol_waypoints_node.py`는 순찰 cycle 이후 `return_home:=true`이면 home waypoint로 복귀한다.
+- RViz marker에는 home entry와 home 위치가 함께 표시된다.
+
+### 확인할 것
+
+- 맵 저장 후 `Saved map automatically` 로그가 출력되는지 확인
+- 이어서 `Map saved. Returning robot to home position.` 로그가 출력되는지 확인
+- home entry와 home waypoint goal이 순서대로 성공하는지 확인
+- 실패 시 timeout, 대체 waypoint, 재시도 정책이 필요한지 기록
+
+### 남은 위험
+
+`office_patrol_nov4.world` 상단 끝 구역에서 reachable frontier가 남아 있는 것으로 판단되면 `/exploration_complete`가 늦어질 수 있다. 반복 실패 frontier suppress와 강제 완료 전환을 재실행으로 검증한다.
+
+## Workflow 6. 화재 감지
 
 ### 목적
 
@@ -241,7 +265,7 @@ roslaunch night_patrol_robot patrol_one_button.launch mapping:=false world_name:
 - 순찰 관리자에게 알림 토픽을 보낼지 결정
 - RViz 또는 별도 UI에 경고를 표시할지 결정
 
-## Workflow 6. 원버튼 자동 실행
+## Workflow 7. 원버튼 자동 실행
 
 ### 목적
 
@@ -260,10 +284,12 @@ roslaunch night_patrol_robot patrol_one_button.launch
 -> mapping 모드 실행
 -> SLAM + frontier 탐색
 -> 맵 저장
+-> home 복귀
 
 저장된 맵 있음
 -> patrol 모드 실행
 -> map_server + AMCL + waypoint 순찰
+-> home 복귀
 ```
 
 ### 확인할 것
@@ -276,12 +302,14 @@ roslaunch night_patrol_robot patrol_one_button.launch
 ## 권장 검증 순서
 
 1. `office_patrol_nov4.world`에서 초기 맵핑 검증
-2. `maps/patrol_map.yaml` 저장 확인
-3. `mapping:=false`로 저장 맵 순찰 검증
-4. home waypoint 복귀 동작 설계 및 검증
-5. 특정 시간 순찰 scheduler 설계
-6. 화재 감지 후 경보/정지/알림 정책 결정
-7. 원버튼 자동 실행 전체 시나리오 검증
+2. 반복 실패 frontier가 완료 전환으로 빠지는지 확인
+3. `maps/patrol_map.yaml` 저장 확인
+4. 맵 저장 후 home 복귀 확인
+5. `mapping:=false`로 저장 맵 순찰 검증
+6. 순찰 완료 후 home 복귀 확인
+7. 특정 시간 순찰 scheduler 설계
+8. 화재 감지 후 경보/정지/알림 정책 결정
+9. 원버튼 자동 실행 전체 시나리오 검증
 
 ## GitHub Issue 분리 기준
 

@@ -41,10 +41,27 @@
       <pose>1.30 0 1 0 0 0</pose>
       <link name="link"><collision name="col"><geometry><box><size>1.00 0.15 2.0</size></box></geometry></collision><visual name="vis"><geometry><box><size>1.00 0.15 2.0</size></box></geometry><material><ambient>0.35 0.35 0.35 1</ambient><diffuse>0.35 0.35 0.35 1</diffuse></material></visual></link> -->
 
-      <model name="wall_bottom_center">
+    <model name="wall_bottom_center">
       <static>true</static>
       <pose>0.0 0 1 0 0 0</pose>
       <link name="link"><collision name="col"><geometry><box><size>3.75 0.15 2.0</size></box></geometry></collision><visual name="vis"><geometry><box><size>3.75 0.15 2.0</size></box></geometry><material><ambient>0.35 0.35 0.35 1</ambient><diffuse>0.35 0.35 0.35 1</diffuse></material></visual></link>
+    </model>
+
+    <!-- 로봇 홈/대기 공간: 아래쪽 중앙에 위쪽 입구가 열린 주차 베이 -->
+    <model name="home_bay_left_wall">
+      <static>true</static>
+      <pose>-0.80 0.68 1 0 0 0</pose>
+      <link name="link"><collision name="col"><geometry><box><size>0.12 1.20 2.0</size></box></geometry></collision><visual name="vis"><geometry><box><size>0.12 1.20 2.0</size></box></geometry><material><ambient>0.28 0.34 0.42 1</ambient><diffuse>0.28 0.34 0.42 1</diffuse></material></visual></link>
+    </model>
+    <model name="home_bay_right_wall">
+      <static>true</static>
+      <pose>0.80 0.68 1 0 0 0</pose>
+      <link name="link"><collision name="col"><geometry><box><size>0.12 1.20 2.0</size></box></geometry></collision><visual name="vis"><geometry><box><size>0.12 1.20 2.0</size></box></geometry><material><ambient>0.28 0.34 0.42 1</ambient><diffuse>0.28 0.34 0.42 1</diffuse></material></visual></link>
+    </model>
+    <model name="home_bay_floor_marker">
+      <static>true</static>
+      <pose>0.0 0.72 0.011 0 0 0</pose>
+      <link name="link"><visual name="vis"><geometry><box><size>1.25 0.75 0.02</size></box></geometry><material><ambient>0.05 0.35 0.65 1</ambient><diffuse>0.05 0.35 0.65 1</diffuse></material></visual></link>
     </model>
 
     <!-- 외벽: 왼쪽 아래 긴 벽, 중간 사무실 때문에 꺾이는 구조 -->
@@ -92,7 +109,7 @@
     <model name="wall_kitchen_top_partition">
       <static>true</static>
       <pose>0.9 6.90 1 0 0 0</pose>
-      <link name="link"><collision name="col"><geometry><box><size>2.40 0.12 2.0</size></box></geometry></collision><visual name="vis"><geometry><box><size>1.8 0.12 2.0</size></box></geometry><material><ambient>0.33 0.33 0.33 1</ambient><diffuse>0.33 0.33 0.33 1</diffuse></material></visual></link>
+      <link name="link"><collision name="col"><geometry><box><size>1.8 0.12 2.0</size></box></geometry></collision><visual name="vis"><geometry><box><size>1.8 0.12 2.0</size></box></geometry><material><ambient>0.33 0.33 0.33 1</ambient><diffuse>0.33 0.33 0.33 1</diffuse></material></visual></link>
     </model>
 
     <!-- <model name="wall_office_partition">
