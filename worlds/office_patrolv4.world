@@ -152,7 +152,7 @@
       <diffuse>1 0.25 0.02 1</diffuse>
       <specular>1 0.2 0.02 1</specular>
       <attenuation>
-        <range>1</range>
+        <range>0.5</range>
         <constant>0.5</constant>
         <linear>0.1</linear>
         <quadratic>0.01</quadratic>

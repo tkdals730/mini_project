@@ -8,6 +8,7 @@ import yaml
 from actionlib_msgs.msg import GoalStatus
 from geometry_msgs.msg import Point, PoseWithCovarianceStamped, Quaternion
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
+from std_msgs.msg import Bool
 from tf.transformations import quaternion_from_euler
 from visualization_msgs.msg import Marker, MarkerArray
 
@@ -21,11 +22,13 @@ class PatrolWaypointsNode:
     def __init__(self):
         self.client = actionlib.SimpleActionClient("move_base", MoveBaseAction)
         self.initial_pose_received = False
+        self.patrol_paused = False
         self.marker_pub = rospy.Publisher(
             "/patrol_waypoints/markers", MarkerArray, queue_size=1, latch=True
         )
 
         rospy.Subscriber("/amcl_pose", PoseWithCovarianceStamped, self._amcl_pose_callback)
+        rospy.Subscriber("/patrol_pause", Bool, self._patrol_pause_callback, queue_size=1)
 
         self.loop_enabled = rospy.get_param("~patrol_loop", True)
         self.return_home_enabled = rospy.get_param("~return_home", True)
@@ -68,6 +71,15 @@ class PatrolWaypointsNode:
 
     def _amcl_pose_callback(self, _msg):
         self.initial_pose_received = True
+
+    def _patrol_pause_callback(self, msg):
+        paused = bool(msg.data)
+        if paused != self.patrol_paused:
+            self.patrol_paused = paused
+            if paused:
+                rospy.logwarn("Patrol paused by fire response.")
+            else:
+                rospy.loginfo("Patrol pause cleared. Continuing patrol.")
 
     def _load_waypoints_from_file(self, path):
         if not path:
@@ -258,19 +270,42 @@ class PatrolWaypointsNode:
 
     def _send_goal_and_wait(self, waypoint, label):
         goal = self._build_goal(waypoint)
-        rospy.loginfo(
-            "Sending %s: x=%.2f y=%.2f yaw=%.2f",
-            label,
-            waypoint.get("x", 0.0),
-            waypoint.get("y", 0.0),
-            waypoint.get("yaw", 0.0),
-        )
-        self.client.send_goal(goal)
-        if not self.client.wait_for_result(self.goal_timeout):
-            self.client.cancel_goal()
-            rospy.logwarn("%s timed out after %.1f sec.", label, self.goal_timeout.to_sec())
-            return GoalStatus.ABORTED
-        return self.client.get_state()
+        while not rospy.is_shutdown():
+            self._wait_while_paused()
+            rospy.loginfo(
+                "Sending %s: x=%.2f y=%.2f yaw=%.2f",
+                label,
+                waypoint.get("x", 0.0),
+                waypoint.get("y", 0.0),
+                waypoint.get("yaw", 0.0),
+            )
+            self.client.send_goal(goal)
+            deadline = rospy.Time.now() + self.goal_timeout
+
+            while not rospy.is_shutdown():
+                if self.patrol_paused:
+                    self.client.cancel_goal()
+                    rospy.logwarn("%s canceled while fire response is active.", label)
+                    self.client.wait_for_result(rospy.Duration(2.0))
+                    break
+
+                if self.client.wait_for_result(rospy.Duration(0.2)):
+                    return self.client.get_state()
+
+                if rospy.Time.now() >= deadline:
+                    self.client.cancel_goal()
+                    rospy.logwarn("%s timed out after %.1f sec.", label, self.goal_timeout.to_sec())
+                    return GoalStatus.ABORTED
+
+            self._wait_while_paused()
+            rospy.loginfo("Retrying %s after patrol pause.", label)
+
+        return GoalStatus.PREEMPTED
+
+    def _wait_while_paused(self):
+        rate = rospy.Rate(5)
+        while not rospy.is_shutdown() and self.patrol_paused:
+            rate.sleep()
 
     def _wait_at_waypoint(self, waypoint, label):
         wait_sec = waypoint.get("wait_sec", self.wait_after_goal_sec)

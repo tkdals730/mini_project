@@ -21,12 +21,20 @@
   <arg name="use_rviz" default="true" />
   <arg name="use_camera_viewer" default="true" />
   <arg name="use_fire_detection" default="true" />
+  <arg name="use_fire_response" default="true" />
   <arg name="camera_view_topic" default="/fire_detection/debug_image" />
+  <arg name="fire_stop_window_sec" default="1.5" />
+  <arg name="fire_stop_required_sec" default="0.25" />
+  <arg name="fire_alert_window_sec" default="5.0" />
+  <arg name="fire_alert_required_sec" default="2.5" />
+  <arg name="fire_clear_window_sec" default="5.0" />
+  <arg name="fire_clear_max_sec" default="0.2" />
   <arg name="mapping_strategy" default="frontier" />
   <!-- rviz 설정 -->
   <arg name="rviz_config" default="$(find night_patrol_robot)/rviz/patrol.rviz" />
   <!-- 맵 설정 -->
-  <arg name="world_name" default="$(find night_patrol_robot)/worlds/office_patrol_nov4.world" />
+  <!-- <arg name="world_name" default="$(find night_patrol_robot)/worlds/office_patrol_nov4.world" /> -->
+  <arg name="world_name" default="$(find night_patrol_robot)/worlds/office_patrolv4.world" />
   <arg name="frontier_goal_timeout_sec" default="25.0" />
   <arg name="frontier_min_goal_distance" default="0.4" />
   <arg name="frontier_max_goal_distance" default="0.0" />
@@ -91,7 +99,14 @@
     <param name="use_rviz" value="$(arg use_rviz)" />
     <param name="use_camera_viewer" value="$(arg use_camera_viewer)" />
     <param name="use_fire_detection" value="$(arg use_fire_detection)" />
+    <param name="use_fire_response" value="$(arg use_fire_response)" />
     <param name="camera_view_topic" value="$(arg camera_view_topic)" />
+    <param name="fire_stop_window_sec" value="$(arg fire_stop_window_sec)" />
+    <param name="fire_stop_required_sec" value="$(arg fire_stop_required_sec)" />
+    <param name="fire_alert_window_sec" value="$(arg fire_alert_window_sec)" />
+    <param name="fire_alert_required_sec" value="$(arg fire_alert_required_sec)" />
+    <param name="fire_clear_window_sec" value="$(arg fire_clear_window_sec)" />
+    <param name="fire_clear_max_sec" value="$(arg fire_clear_max_sec)" />
     <param name="mapping_strategy" value="$(arg mapping_strategy)" />
     <param name="rviz_config" value="$(arg rviz_config)" />
     <param name="world_name" value="$(arg world_name)" />

@@ -11,6 +11,7 @@ class FireDetectionNode:
         self.bridge = CvBridge()
         self.detected_streak = 0
         self.fire_detected = False
+        self.fire_alert_active = False
         self.last_alert_time = rospy.Time(0)
 
         # 테스트 월드의 fire_target은 색이 뚜렷해서,
@@ -25,6 +26,12 @@ class FireDetectionNode:
         self.detection_pub = rospy.Publisher("/fire_detected", Bool, queue_size=10)
         self.debug_pub = rospy.Publisher("/fire_detection/debug_image", Image, queue_size=1)
         rospy.Subscriber("/camera/rgb/image_raw", Image, self._image_callback, queue_size=1)
+        rospy.Subscriber(
+            "/fire_response/alert_active", Bool, self._fire_alert_callback, queue_size=1
+        )
+
+    def _fire_alert_callback(self, msg):
+        self.fire_alert_active = bool(msg.data)
 
     def _build_fire_mask(self, hsv_image):
         # 불 오브젝트의 발광색과 비슷한 빨강/주황 계열을 함께 마스킹한다.
@@ -111,6 +118,17 @@ class FireDetectionNode:
                 (0, 0, 255) if self.fire_detected else (0, 255, 0),
                 2,
             )
+            if self.fire_alert_active:
+                cv2.rectangle(debug_image, (0, 0), (debug_image.shape[1], 70), (0, 0, 180), -1)
+                cv2.putText(
+                    debug_image,
+                    "FIRE ALERT!!!",
+                    (20, 48),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    1.35,
+                    (255, 255, 255),
+                    3,
+                )
             try:
                 self.debug_pub.publish(self.bridge.cv2_to_imgmsg(debug_image, encoding="bgr8"))
             except CvBridgeError as exc:

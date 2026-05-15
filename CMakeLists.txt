@@ -171,6 +171,7 @@ catkin_install_python(PROGRAMS
   scripts/auto_explore_node.py
   scripts/auto_map_saver_node.py
   scripts/fire_detection_node.py
+  scripts/fire_response_node.py
   scripts/frontier_explore_node.py
   scripts/generate_patrol_waypoints.py
   scripts/patrol_launch_supervisor.py

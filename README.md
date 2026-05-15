@@ -11,6 +11,7 @@ Gazebo 시뮬레이션 환경에서 TurtleBot3 Waffle Pi를 사용해 야간 순
 - 저장된 맵, AMCL, `move_base`를 이용한 waypoint 순찰
 - 순찰 한 바퀴 완료 후 home waypoint 복귀 옵션 제공
 - 카메라 RGB 이미지에서 빨강/주황 계열을 감지하는 화재 감지 노드
+- 화재 후보가 일정 시간 이상 보이면 순찰을 일시 정지하고, 추가 확인 후 `/patrol_alert`를 publish하는 대응 노드
 - RViz 설정과 카메라 디버그 이미지 뷰어 실행 옵션 제공
 
 ## 패키지 구조
@@ -118,6 +119,7 @@ roslaunch night_patrol_robot patrol_one_button.launch mapping:=false patrol_loop
 - `scripts/auto_explore_node.py`: LaserScan 기반의 간단한 벽 따라가기 탐색
 - `scripts/patrol_waypoints_node.py`: AMCL pose 수신 후 설정된 waypoint를 순서대로 순찰
 - `scripts/fire_detection_node.py`: `/camera/rgb/image_raw`를 받아 화재 후보 색상 영역을 감지하고 `/fire_detected`와 디버그 이미지를 publish
+- `scripts/fire_response_node.py`: `/fire_detected`를 시간 창 기준으로 판단해 순찰 정지, `/patrol_alert`, 화면 경고 상태를 publish
 
 ## 현재 진행 상태
 
@@ -128,11 +130,13 @@ roslaunch night_patrol_robot patrol_one_button.launch mapping:=false patrol_loop
 - 초기 맵핑, 자동 맵 저장, 저장 맵 기반 waypoint 순찰, 순찰 완료 후 home 복귀 흐름을 확인했습니다.
 - RViz에서 `Patrol Waypoints` marker로 순찰 waypoint, home entry, home 위치와 순찰 경로를 확인할 수 있습니다.
 - 화재 감지는 현재 Gazebo 테스트 오브젝트에 맞춘 색상 threshold 방식이며, 실제 화재 일반화 모델은 아직 아닙니다.
+- 화재 대응은 오탐을 줄이기 위해 즉시 경보가 아니라 `빠른 정지 -> 추가 확인 -> 경보 발행` 순서로 동작합니다.
+- Gazebo 테스트에서 화재 후보 감지 시 정지, 일정 시간 이상 감지 시 alert 표시, 화재 후보 해제 후 순찰 재개, home 복귀까지 확인했습니다.
 
 ## 앞으로 구현해야 할 부분
 
 - 특정 시간 순찰 scheduler 또는 시작 트리거 추가
-- 화재 감지 결과를 순찰 로직과 연동해 감지 시 정지, 알림, 위치 기록을 수행하도록 개선
+- 화재 감지 위치 기록과 웹/앱 연동용 rosbridge 또는 WebSocket 브리지 설계
 - `mapping:=auto` 기준으로 맵이 없는 상태부터 맵핑, 저장, home 복귀, 이후 순찰까지 전체 시나리오 재현 검증
 - 필요 시 `frontier_viewpoint_clearance_cells`, distance/obstacle penalty, home waypoint/tolerance 등 세부 튜닝 재검토
 - ROS launch smoke test 또는 간단한 노드 단위 테스트 추가
@@ -147,6 +151,7 @@ roslaunch night_patrol_robot patrol_one_button.launch mapping:=false patrol_loop
 - home 복귀 위치는 `home_approach_waypoint`와 `home_waypoint` 파라미터에서 수정합니다.
 - Gazebo spawn pose와 AMCL initial pose는 `spawn_*`, `initial_pose_*` launch arg로 분리되어 있습니다.
 - 화재 감지 디버그 이미지는 기본적으로 `/fire_detection/debug_image`에서 확인합니다.
+- 화재 대응 기본값은 최근 1.5초 중 0.25초 이상 감지 시 정지, 정지 후 최근 5초 중 2.5초 이상 감지 시 `/patrol_alert` 발행, 최근 5초 중 0.2초 이하로 떨어지면 해제입니다.
 
 ## Frontier 탐색 파라미터
 
