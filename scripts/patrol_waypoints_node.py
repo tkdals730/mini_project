@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 
 import actionlib
+import os
 import rospy
+import time
+import yaml
 from actionlib_msgs.msg import GoalStatus
 from geometry_msgs.msg import Point, PoseWithCovarianceStamped, Quaternion
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
@@ -29,12 +32,26 @@ class PatrolWaypointsNode:
         self.wait_after_goal_sec = rospy.get_param("~wait_after_goal_sec", 5.0)
         # 위치 초기화 직후 goal을 보내면 경로가 흔들릴 수 있어서 대기 시간을 둔다.
         self.initial_wait_sec = rospy.get_param("~initial_wait_sec", 2.0)
-        self.waypoints = rospy.get_param("~waypoints", [])
+        self.waypoints_file = rospy.get_param("~waypoints_file", "")
+        self.waypoints_file_wait_sec = rospy.get_param("~waypoints_file_wait_sec", 3.0)
+        self.waypoints_file_require_fresh = rospy.get_param(
+            "~waypoints_file_require_fresh", False
+        )
+        self.node_start_wall_time = time.time()
+        self.fallback_waypoints = rospy.get_param(
+            "~fallback_waypoints", rospy.get_param("~waypoints", [])
+        )
+        self.waypoints = list(self.fallback_waypoints)
+        loaded_waypoints = self._load_waypoints_from_file(self.waypoints_file)
+        if loaded_waypoints:
+            self.waypoints = loaded_waypoints
         self.home_approach_waypoint = rospy.get_param("~home_approach_waypoint", {})
         self.home_waypoint = rospy.get_param("~home_waypoint", {})
 
         if not self.waypoints:
-            rospy.logerr("No waypoints configured. Set ~waypoints before starting patrol.")
+            rospy.logerr(
+                "No patrol waypoints available. Generate a waypoint file or set ~fallback_waypoints."
+            )
             raise rospy.ROSInitException("waypoints parameter is empty")
 
         if self.return_home_enabled and not self._has_home_waypoint():
@@ -56,6 +73,81 @@ class PatrolWaypointsNode:
 
     def _amcl_pose_callback(self, _msg):
         self.initial_pose_received = True
+
+    def _load_waypoints_from_file(self, path):
+        if not path:
+            return []
+
+        expanded_path = os.path.expanduser(path)
+        wait_until = rospy.Time.now() + rospy.Duration(self.waypoints_file_wait_sec)
+        while (
+            not rospy.is_shutdown()
+            and self.waypoints_file_wait_sec > 0.0
+            and not self._waypoints_file_ready(expanded_path)
+            and rospy.Time.now() < wait_until
+        ):
+            rospy.sleep(0.1)
+
+        if not os.path.exists(expanded_path):
+            rospy.logwarn(
+                "Generated waypoint file not found: %s. Falling back to configured fallback waypoints.",
+                expanded_path,
+            )
+            return []
+
+        if self.waypoints_file_require_fresh and not self._waypoints_file_ready(expanded_path):
+            rospy.logwarn(
+                "Generated waypoint file was not refreshed in time: %s. Falling back to configured fallback waypoints.",
+                expanded_path,
+            )
+            return []
+
+        with open(expanded_path, "r", encoding="utf-8") as waypoint_file:
+            data = yaml.safe_load(waypoint_file) or {}
+
+        if isinstance(data, dict):
+            waypoints = data.get("waypoints", [])
+        else:
+            waypoints = data
+
+        if not isinstance(waypoints, list):
+            rospy.logwarn(
+                "Waypoint file %s does not contain a waypoint list. Falling back to configured fallback waypoints.",
+                expanded_path,
+            )
+            return []
+
+        valid_waypoints = []
+        for index, waypoint in enumerate(waypoints, start=1):
+            if not isinstance(waypoint, dict) or "x" not in waypoint or "y" not in waypoint:
+                rospy.logwarn("Skipping invalid waypoint %d from %s.", index, expanded_path)
+                continue
+            valid_waypoints.append(
+                {
+                    "x": float(waypoint.get("x", 0.0)),
+                    "y": float(waypoint.get("y", 0.0)),
+                    "yaw": float(waypoint.get("yaw", 0.0)),
+                    "wait_sec": float(waypoint.get("wait_sec", self.wait_after_goal_sec)),
+                }
+            )
+
+        if valid_waypoints:
+            rospy.loginfo(
+                "Loaded %d generated patrol waypoints from %s.",
+                len(valid_waypoints),
+                expanded_path,
+            )
+        return valid_waypoints
+
+    def _waypoints_file_ready(self, path):
+        if not os.path.exists(path):
+            return False
+        if not self.waypoints_file_require_fresh:
+            return True
+
+        # roslaunch starts nodes in parallel. Allow a small wall-time margin so a
+        # generator that finishes just before this node initializes still counts.
+        return os.path.getmtime(path) >= self.node_start_wall_time - 2.0
 
     def _build_goal(self, waypoint):
         goal = MoveBaseGoal()
@@ -209,19 +301,26 @@ class PatrolWaypointsNode:
             else:
                 rospy.loginfo("Patrol cycle %d completed.", cycle_index)
                 if self.return_home_enabled and self._has_home_waypoint():
+                    home_entry_reached = True
                     if self._has_home_approach_waypoint():
                         state = self._send_goal_and_wait(
                             self.home_approach_waypoint, "home entry waypoint"
                         )
                         if state != GoalStatus.SUCCEEDED:
                             rospy.logwarn("Home entry failed with state %d.", state)
-                            continue
-                        self._wait_at_waypoint(self.home_approach_waypoint, "Home entry")
+                            home_entry_reached = False
+                        else:
+                            self._wait_at_waypoint(self.home_approach_waypoint, "Home entry")
 
                     state = self._send_goal_and_wait(self.home_waypoint, "home waypoint")
                     if state == GoalStatus.SUCCEEDED:
                         self._wait_at_waypoint(self.home_waypoint, "Home waypoint")
-                        rospy.loginfo("Home return completed after patrol cycle %d.", cycle_index)
+                        if home_entry_reached:
+                            rospy.loginfo("Home return completed after patrol cycle %d.", cycle_index)
+                        else:
+                            rospy.loginfo(
+                                "Home waypoint reached after skipping failed entry waypoint."
+                            )
                     else:
                         rospy.logwarn("Home return failed with state %d.", state)
 

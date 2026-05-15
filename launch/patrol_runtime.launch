@@ -6,7 +6,13 @@
   <arg name="mapping" default="true" />
   <arg name="map_output" default="$(find night_patrol_robot)/maps/patrol_map" />
   <arg name="map_file" default="$(find night_patrol_robot)/maps/patrol_map.yaml" />
-  <arg name="patrol_loop" default="true" />
+  <arg name="generated_waypoints_file" default="$(find night_patrol_robot)/maps/generated_patrol_waypoints.yaml" />
+  <arg name="auto_generate_waypoints" default="true" />
+  <arg name="generated_waypoint_count" default="6" />
+  <arg name="generated_waypoint_spacing" default="1.8" />
+  <arg name="generated_waypoint_min_spacing" default="1.6" />
+  <arg name="generated_waypoint_clearance" default="0.35" />
+  <arg name="patrol_loop" default="false" />
   <arg name="return_home" default="true" />
   <arg name="patrol_wait_sec" default="5.0" />
   <arg name="use_rviz" default="true" />
@@ -123,7 +129,7 @@
       </rosparam>
       <rosparam param="home_waypoint">
         x: 0.00
-        y: 0.55
+        y: 0.85
         yaw: 1.57
         wait_sec: 3.0
       </rosparam>
@@ -184,6 +190,22 @@
   <group unless="$(arg mapping)">
     <node pkg="map_server" type="map_server" name="map_server" args="$(arg map_file)" />
 
+    <node if="$(arg auto_generate_waypoints)"
+          pkg="night_patrol_robot"
+          type="generate_patrol_waypoints.py"
+          name="generate_patrol_waypoints"
+          output="screen">
+      <param name="map_file" value="$(arg map_file)" />
+      <param name="output_file" value="$(arg generated_waypoints_file)" />
+      <param name="max_waypoints" value="$(arg generated_waypoint_count)" />
+      <param name="sample_spacing" value="$(arg generated_waypoint_spacing)" />
+      <param name="min_waypoint_spacing" value="$(arg generated_waypoint_min_spacing)" />
+      <param name="obstacle_clearance" value="$(arg generated_waypoint_clearance)" />
+      <param name="start_x" value="$(arg initial_pose_x)" />
+      <param name="start_y" value="$(arg initial_pose_y)" />
+      <param name="wait_sec" value="$(arg patrol_wait_sec)" />
+    </node>
+
     <rosparam command="load" file="$(find night_patrol_robot)/config/amcl.yaml" ns="amcl" />
     <node pkg="amcl" type="amcl" name="amcl" output="screen">
       <param name="initial_pose_x" value="$(arg initial_pose_x)" />
@@ -205,7 +227,10 @@
       <param name="patrol_loop" value="$(arg patrol_loop)" />
       <param name="return_home" value="$(arg return_home)" />
       <param name="wait_after_goal_sec" value="$(arg patrol_wait_sec)" />
-      <rosparam param="waypoints">
+      <param name="waypoints_file" value="$(arg generated_waypoints_file)" />
+      <param name="waypoints_file_wait_sec" value="20.0" />
+      <param name="waypoints_file_require_fresh" value="$(arg auto_generate_waypoints)" />
+      <rosparam param="fallback_waypoints">
         - {x: 0.00, y: 1.35, yaw: 1.57, wait_sec: 2.0}
         - {x: -1.00, y: 5.04, yaw: 1.01, wait_sec: 3.0}
         - {x: 0.48, y: 7.42, yaw: -1.23, wait_sec: 5.0}
@@ -220,7 +245,7 @@
       </rosparam>
       <rosparam param="home_waypoint">
         x: 0.00
-        y: 0.55
+        y: 0.85
         yaw: 1.57
         wait_sec: 3.0
       </rosparam>

@@ -45,6 +45,12 @@ class PatrolLaunchSupervisor:
         arg_names = [
             "map_output",
             "map_file",
+            "generated_waypoints_file",
+            "auto_generate_waypoints",
+            "generated_waypoint_count",
+            "generated_waypoint_spacing",
+            "generated_waypoint_min_spacing",
+            "generated_waypoint_clearance",
             "patrol_loop",
             "return_home",
             "patrol_wait_sec",
