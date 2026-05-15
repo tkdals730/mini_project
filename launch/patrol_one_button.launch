@@ -22,7 +22,7 @@
   <arg name="world_name" default="$(find night_patrol_robot)/worlds/office_patrol_nov4.world" />
   <arg name="frontier_goal_timeout_sec" default="25.0" />
   <arg name="frontier_min_goal_distance" default="0.4" />
-  <arg name="frontier_max_goal_distance" default="4.0" />
+  <arg name="frontier_max_goal_distance" default="0.0" />
   <arg name="frontier_blacklist_radius" default="0.2" />
   <arg name="frontier_area_blacklist_radius" default="0.6" />
   <arg name="frontier_blacklist_ttl_sec" default="90.0" />

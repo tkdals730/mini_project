@@ -124,13 +124,15 @@ roslaunch night_patrol_robot patrol_one_button.launch mapping:=false patrol_loop
 - `worlds/office_patrol_nov4.world` 기반의 최신 사무실 월드 구성이 진행 중입니다.
 - `maps/patrol_map.yaml`과 `maps/patrol_map.pgm`은 현재 저장 맵 기반 순찰 검증에 사용할 수 있는 산출물로 갱신되어 있습니다.
 - frontier 탐색은 cluster 단위 후보 생성, viewpoint 후보, 정보량, 거리, 장애물 근접도, goal/frontier blacklist를 함께 반영해 goal을 선택합니다.
+- `frontier_max_goal_distance` 기본값을 `0.0`으로 두어 먼 미탐사 frontier도 후보에서 제외하지 않도록 조정했습니다. 실행 로그에서 약 9m 거리 frontier goal 선택과 반복 실패 후 `/exploration_complete` 발행을 확인했습니다.
 - 저장 맵 기반 순찰은 `map_server`, AMCL, `move_base`, 수동 waypoint 경로로 동작 확인 중입니다.
 - RViz에서 `Patrol Waypoints` marker로 순찰 waypoint, home entry, home 위치와 순찰 경로를 확인할 수 있습니다.
 - 화재 감지는 현재 Gazebo 테스트 오브젝트에 맞춘 색상 threshold 방식이며, 실제 화재 일반화 모델은 아직 아닙니다.
 
 ## 앞으로 구현해야 할 부분
 
-- `office_patrol_nov4.world` 상단 끝 구역에서 반복 실패 frontier가 탐색 완료로 잘 빠지는지 재검증
+- 맵 저장 후 home 복귀 중 최종 waypoint 근처에서 멈추는 원인 확인 및 home waypoint/tolerance 조정
+- 필요 시 `frontier_viewpoint_clearance_cells`, distance/obstacle penalty 등 frontier 세부 튜닝 재검토
 - 순찰 실패 시 복구/중단 동작 검증 및 정책 정리
 - home 복귀 실패 시 재시도/대체 waypoint 정책 정리
 - 특정 시간 순찰 scheduler 또는 시작 트리거 추가
