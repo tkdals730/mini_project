@@ -24,9 +24,9 @@ DWAPlannerROS:
   min_in_place_vel_theta: 0.2
   acc_lim_x: 1.0
   acc_lim_theta: 2.0
-  yaw_goal_tolerance: 0.15
-  xy_goal_tolerance: 0.15
-  latch_xy_goal_tolerance: false
+  yaw_goal_tolerance: 0.25
+  xy_goal_tolerance: 0.25
+  latch_xy_goal_tolerance: true
   sim_time: 1.0
   vx_samples: 8
   vtheta_samples: 18
