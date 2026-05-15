@@ -11,9 +11,9 @@
 | 1 | 초기 맵핑 | 완료 | 필요 시 다른 월드/파라미터에서 재검증 |
 | 2 | 맵 저장 | 완료 | 저장 맵 산출물을 기준 맵으로 유지 |
 | 3 | 저장 맵 기반 순찰 | 완료 | 추가 실패 케이스 발견 시 복구 정책 보강 |
-| 4 | 특정 시간 순찰 | 미구현 | scheduler 노드 또는 시작 트리거 방식 결정 |
+| 4 | 특정 시간 순찰 | 설계 결정, 미구현 | scheduler 노드 구현 및 시간 압축 테스트 |
 | 5 | 원래 자리 복귀 | 완료 | 필요 시 home 좌표/tolerance 미세 조정 |
-| 6 | 화재 감지 | 기본 감지 구현 | 감지 후 경보, 정지, 알림 정책 결정 |
+| 6 | 화재 감지 | 완료 | 추후 웹/앱 연동과 감지 위치 기록 설계 |
 | 7 | 원버튼 자동 실행 | 부분 구현 | `mapping:=auto` 전체 흐름을 처음부터 끝까지 검증 |
 
 ### 체크리스트 진행률
@@ -38,21 +38,23 @@
   - [x] waypoint 순찰 확인
   - [x] 순찰 실패 시 복구/중단 동작 확인
 - [ ] 4. 특정 시간 순찰 완료
-  - [ ] 순찰 시간 설정 방식 결정
+  - [x] 순찰 시간 설정 방식 결정
   - [ ] scheduler 또는 시작 트리거 구현
   - [ ] 순찰 시간 도달 시 자동 출발 확인
-  - [ ] 다음 순찰 시간까지 대기 확인
+  - [ ] 순찰 복귀 후 설정 시간만큼 대기 확인
+  - [ ] 종료 시각 이후 새 순찰을 시작하지 않는지 확인
 - [x] 5. 원래 자리 복귀 완료
   - [x] home 위치 정의
   - [x] 순찰 완료 후 home 복귀 구현
   - [x] 맵 저장 후 home 복귀 구현
   - [x] home 복귀 최종 waypoint 성공 확인
-- [ ] 6. 화재 감지 완료
+- [x] 6. 화재 감지 완료
   - [x] 카메라 토픽 확인
   - [x] `/fire_detected` publish 확인
   - [x] debug image 확인
-  - [ ] 화재 감지 후 경보 방식 결정
-  - [ ] 화재 감지 후 로봇 동작 정책 결정
+  - [x] 화재 감지 후 경보 방식 결정
+  - [x] 화재 감지 후 로봇 동작 정책 결정
+  - [x] 화재 테스트 월드에서 정지, 경보, 해제 후 순찰 재개 확인
 - [ ] 7. 원버튼 자동 실행 완료
   - [x] `patrol_one_button.launch` 진입점 구성
   - [ ] 맵 없을 때 자동 맵핑 확인
@@ -61,10 +63,10 @@
 
 ### 현재 우선순위
 
-1. 특정 시간 순찰 scheduler 또는 시작 트리거 방식을 결정한다.
-2. 화재 감지 후 경보, 정지, 알림 등 대응 정책을 결정한다.
-3. `mapping:=auto` 전체 흐름을 맵이 없는 상태부터 끝까지 재현 검증한다.
-4. 발표/시연용으로 Gazebo/RViz 실행 화면과 핵심 로그를 정리한다.
+1. 결정된 특정 시간 순찰 정책을 scheduler 노드로 구현한다.
+2. `mapping:=auto` 전체 흐름을 맵이 없는 상태부터 끝까지 재현 검증한다.
+3. 발표/시연용으로 Gazebo/RViz 실행 화면과 핵심 로그를 정리한다.
+4. 화재 감지 위치 기록과 웹/앱 연동 방식을 후속 작업으로 설계한다.
 
 ## 전체 운영 흐름
 
@@ -72,10 +74,10 @@
 초기 맵핑
 -> 맵 저장
 -> 저장 맵 기반 순찰
--> 특정 시간 순찰 시작
+-> 첫 순찰 시작 시각까지 대기
 -> waypoint 순찰
 -> 원래 자리 복귀
--> 다음 순찰 시간까지 대기
+-> 복귀 후 설정 시간만큼 대기
 -> 화재 감지 시 경보/대응
 ```
 
@@ -178,33 +180,99 @@ roslaunch night_patrol_robot patrol_one_button.launch mapping:=false
 
 ### 현재 상태
 
-아직 스케줄러 노드는 구현 전이다.
+스케줄 정책은 결정했고, 아직 스케줄러 노드는 구현 전이다.
 현재는 수동으로 `mapping:=false` 순찰 모드를 실행해 waypoint 순찰을 확인하는 단계다.
+
+### 결정된 운영 정책
+
+첫 순찰은 지정된 시작 시각에 출발한다. 이후 반복 순찰은 고정 시각표가 아니라 순찰을 마치고 home waypoint로 복귀한 시점을 기준으로 쉰 뒤 다시 출발한다.
+
+기본 종료 조건은 아침 종료 시각이다. 종료 시각 이후에는 새 순찰을 시작하지 않는다. `max_patrol_cycles`는 선택적 안전장치로 두고, 기본값은 횟수 제한 없음으로 둔다.
+개발/시연 중에는 실제 시작 시각까지 기다리지 않도록 명령어 옵션으로 즉시 첫 순찰을 강제할 수 있게 한다.
+
+```text
+첫 순찰 시작: patrol_start_time
+반복 기준: 순찰 완료 및 home 복귀 후 patrol_rest_after_return_sec 대기
+종료 조건: patrol_end_time 이후 새 순찰 시작 금지
+보조 종료 조건: max_patrol_cycles > 0이면 해당 횟수 도달 시 종료
+테스트 시작: patrol_start_mode:=immediate 이면 시작 시각을 기다리지 않고 첫 순찰 시작
+```
+
+프로젝트 기본값:
+
+```text
+patrol_start_time: 23:00
+patrol_end_time: 07:00
+patrol_rest_after_return_sec: 30
+max_patrol_cycles: 0
+```
+
+`patrol_rest_after_return_sec`는 현재 프로젝트 검증을 위해 30초로 둔다. 실제 운영에서는 3600초처럼 더 긴 값으로 늘릴 수 있다.
+
+예시 흐름:
+
+```text
+23:00 첫 순찰 시작
+23:35 home 복귀 완료
+23:35:30 두 번째 순찰 시작
+00:10 home 복귀 완료
+00:10:30 세 번째 순찰 시작
+...
+07:00 이후 새 순찰 시작 안 함
+```
+
+이 정책은 순찰 시간이 예상보다 길어져도 다음 고정 시각과 충돌하지 않는다. 순찰 횟수보다 야간 시간대 커버를 우선하는 실무형 구성으로 본다.
 
 ### 목표 동작
 
 ```text
 대기 상태
--> 순찰 시간 도달
+-> 첫 순찰 시작 시각 도달
 -> 저장 맵 기반 순찰 시작
 -> 지정 waypoint 방문
 -> 시작 위치 또는 충전 위치로 복귀
--> 다음 순찰 시간까지 대기
+-> 복귀 완료 시점부터 설정 시간만큼 대기
+-> 종료 시각 전이면 다음 순찰 시작
+-> 종료 시각 이후이면 대기 상태 유지
 ```
 
-### 구현 후보
+### 구현 방향
 
-- ROS param으로 순찰 시작 시간 목록 설정
-- 단순 Python scheduler 노드 추가
-- `/start_patrol` 서비스 또는 토픽으로 수동/자동 시작 지원
-- 순찰 완료 후 home waypoint로 복귀
+- ROS param으로 `patrol_start_time`, `patrol_end_time`, `patrol_rest_after_return_sec`, `max_patrol_cycles`, `patrol_start_mode`를 설정한다.
+- 스케줄 판단은 `patrol_waypoints_node.py` 또는 별도 scheduler 노드에서 담당한다.
+- 실제 순찰 cycle은 기존 waypoint 순찰과 home 복귀 로직을 재사용한다.
+- 수동 검증은 `patrol_start_mode:=immediate` launch arg로 첫 순찰을 바로 시작해 확인한다.
+
+### 테스트 전략
+
+실제 23시까지 기다리지 않도록 테스트에서는 첫 순찰을 즉시 시작하고 반복 대기 시간을 30초로 둔다.
+
+```text
+patrol_start_mode: immediate
+patrol_start_time: 23:00
+patrol_end_time: 07:00
+patrol_rest_after_return_sec: 30
+max_patrol_cycles: 3
+```
+
+경계값 검증을 위해 가짜 현재 시각 파라미터도 고려한다.
+
+```text
+patrol_test_now: 22:29
+patrol_test_now: 22:30
+patrol_test_now: 06:59
+patrol_test_now: 07:00
+```
 
 ### 확인할 것
 
 - 순찰 시간이 아닐 때 로봇이 대기하는지 확인
-- 순찰 시간이 되면 waypoint 순찰이 시작되는지 확인
+- 첫 순찰 시작 시각이 되면 waypoint 순찰이 시작되는지 확인
 - 순찰 완료 후 원래 자리 또는 home waypoint로 돌아오는지 확인
-- 다음 순찰 시간까지 다시 대기하는지 확인
+- home 복귀 완료 후 `patrol_rest_after_return_sec`만큼 대기하는지 확인
+- 대기 후 종료 시각 전이면 다음 순찰을 시작하는지 확인
+- 종료 시각 이후에는 새 순찰을 시작하지 않는지 확인
+- `max_patrol_cycles`가 0보다 클 때 최대 순찰 횟수에서 멈추는지 확인
 
 ## Workflow 5. Home 복귀
 
@@ -254,16 +322,20 @@ roslaunch night_patrol_robot patrol_one_button.launch mapping:=false world_name:
 - `/camera/rgb/image_raw`가 publish되는지 확인
 - `/fire_detected`가 publish되는지 확인
 - `/fire_detection/debug_image`에서 감지 영역이 표시되는지 확인
+- `/patrol_pause`가 true가 되면서 순찰 goal이 취소되고 로봇이 정지하는지 확인
+- 정지 후에도 화재 후보가 유지되면 `/patrol_alert`에 `화재 발생!!!` 메시지가 publish되는지 확인
+- 경보 상태에서 debug image 상단에 `FIRE ALERT!!!` 배너가 표시되는지 확인
+- 화재 후보가 사라지면 `/patrol_pause`가 false가 되고 같은 waypoint 순찰을 재개하는지 확인
 - 화재가 없을 때 false 상태가 유지되는지 확인
 - 화재 후보가 보이면 true 상태로 바뀌는지 확인
 
-### 아직 결정할 것
+### 현재 정책
 
-- 화재 감지 시 소리 경보를 울릴지 결정
-- 로봇을 즉시 정지시킬지 결정
-- 감지 위치를 저장할지 결정
-- 순찰 관리자에게 알림 토픽을 보낼지 결정
-- RViz 또는 별도 UI에 경고를 표시할지 결정
+- 색상 기반 감지는 오탐 가능성이 있으므로 바로 경보를 내지 않는다.
+- 최근 1.5초 중 0.25초 이상 화재 후보가 보이면 순찰을 일시 정지한다.
+- 정지 후 최근 5초 중 2.5초 이상 후보가 유지되면 `/patrol_alert`로 `화재 발생!!!`을 publish한다.
+- 최근 5초 중 감지 시간이 0.2초 이하로 떨어지면 경보/정지를 해제하고 순찰을 재개한다.
+- 웹/앱 연동은 `/patrol_alert`와 `/fire_detection/debug_image`를 rosbridge/WebSocket으로 전달하는 확장 작업으로 분리한다.
 
 ## Workflow 7. 원버튼 자동 실행
 
