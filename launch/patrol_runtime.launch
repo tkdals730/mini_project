@@ -19,7 +19,14 @@
   <arg name="use_rviz" default="true" />
   <arg name="use_camera_viewer" default="true" />
   <arg name="use_fire_detection" default="true" />
+  <arg name="use_fire_response" default="true" />
   <arg name="camera_view_topic" default="/fire_detection/debug_image" />
+  <arg name="fire_stop_window_sec" default="1.5" />
+  <arg name="fire_stop_required_sec" default="0.25" />
+  <arg name="fire_alert_window_sec" default="5.0" />
+  <arg name="fire_alert_required_sec" default="2.5" />
+  <arg name="fire_clear_window_sec" default="5.0" />
+  <arg name="fire_clear_max_sec" default="0.2" />
   <arg name="mapping_strategy" default="frontier" />
   <arg name="rviz_config" default="$(find night_patrol_robot)/rviz/patrol.rviz" />
   <arg name="frontier_goal_timeout_sec" default="25.0" />
@@ -97,6 +104,19 @@
         type="fire_detection_node.py"
         name="fire_detection_node"
         output="screen" />
+
+  <node if="$(arg use_fire_response)"
+        pkg="night_patrol_robot"
+        type="fire_response_node.py"
+        name="fire_response_node"
+        output="screen">
+    <param name="stop_window_sec" value="$(arg fire_stop_window_sec)" />
+    <param name="stop_required_sec" value="$(arg fire_stop_required_sec)" />
+    <param name="alert_window_sec" value="$(arg fire_alert_window_sec)" />
+    <param name="alert_required_sec" value="$(arg fire_alert_required_sec)" />
+    <param name="clear_window_sec" value="$(arg fire_clear_window_sec)" />
+    <param name="clear_max_sec" value="$(arg fire_clear_max_sec)" />
+  </node>
 
   <!-- 초기 맵핑 모드 -->
   <group if="$(arg mapping)">
