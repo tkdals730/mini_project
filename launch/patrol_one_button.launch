@@ -17,6 +17,7 @@
   <arg name="patrol_loop" default="false" />
   <arg name="return_home" default="true" />
   <arg name="patrol_wait_sec" default="5.0" />
+  <arg name="patrol_goal_timeout_sec" default="75.0" />
   <arg name="use_rviz" default="true" />
   <arg name="use_camera_viewer" default="true" />
   <arg name="use_fire_detection" default="true" />
@@ -86,6 +87,7 @@
     <param name="patrol_loop" value="$(arg patrol_loop)" />
     <param name="return_home" value="$(arg return_home)" />
     <param name="patrol_wait_sec" value="$(arg patrol_wait_sec)" />
+    <param name="patrol_goal_timeout_sec" value="$(arg patrol_goal_timeout_sec)" />
     <param name="use_rviz" value="$(arg use_rviz)" />
     <param name="use_camera_viewer" value="$(arg use_camera_viewer)" />
     <param name="use_fire_detection" value="$(arg use_fire_detection)" />
