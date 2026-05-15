@@ -145,7 +145,7 @@ roslaunch night_patrol_robot patrol_one_button.launch mapping:=false patrol_loop
 
 - 기본 mapping 전략은 `mapping_strategy:=frontier`입니다.
 - 기본 월드는 `worlds/office_patrol_nov4.world`입니다.
-- 순찰 waypoint는 `launch/patrol_runtime.launch` 안의 `waypoints` 파라미터에서 수정하며, 현재 저장 맵 기준 수동 waypoint가 반영되어 있습니다.
+- 순찰 waypoint는 기본적으로 저장 맵에서 자동 생성한 `maps/generated_patrol_waypoints.yaml`을 사용합니다. `launch/patrol_runtime.launch` 안의 `fallback_waypoints`는 자동 생성 실패 시 사용할 예비 경로입니다.
 - home 복귀 위치는 `home_approach_waypoint`와 `home_waypoint` 파라미터에서 수정합니다.
 - Gazebo spawn pose와 AMCL initial pose는 `spawn_*`, `initial_pose_*` launch arg로 분리되어 있습니다.
 - 화재 감지 디버그 이미지는 기본적으로 `/fire_detection/debug_image`에서 확인합니다.
