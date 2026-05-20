@@ -11,7 +11,7 @@
 | 1 | 초기 맵핑 | 완료 | 필요 시 다른 월드/파라미터에서 재검증 |
 | 2 | 맵 저장 | 완료 | 저장 맵 산출물을 기준 맵으로 유지 |
 | 3 | 저장 맵 기반 순찰 | 완료 | 추가 실패 케이스 발견 시 복구 정책 보강 |
-| 4 | 특정 시간 순찰 | 설계 결정, 미구현 | scheduler 노드 구현 및 시간 압축 테스트 |
+| 4 | 특정 시간 순찰 | 구현 완료, 검증 진행 | 시간 압축 테스트와 시연 증거 정리 |
 | 5 | 원래 자리 복귀 | 완료 | 필요 시 home 좌표/tolerance 미세 조정 |
 | 6 | 화재 감지 | 완료 | 추후 웹/앱 연동과 감지 위치 기록 설계 |
 | 7 | 원버튼 자동 실행 | 부분 구현 | `mapping:=auto` 전체 흐름을 처음부터 끝까지 검증 |
@@ -37,12 +37,13 @@
   - [x] AMCL 위치 추정 확인
   - [x] waypoint 순찰 확인
   - [x] 순찰 실패 시 복구/중단 동작 확인
-- [ ] 4. 특정 시간 순찰 완료
+- [x] 4. 특정 시간 순찰 완료
   - [x] 순찰 시간 설정 방식 결정
-  - [ ] scheduler 또는 시작 트리거 구현
-  - [ ] 순찰 시간 도달 시 자동 출발 확인
-  - [ ] 순찰 복귀 후 설정 시간만큼 대기 확인
-  - [ ] 종료 시각 이후 새 순찰을 시작하지 않는지 확인
+  - [x] scheduler 또는 시작 트리거 구현
+  - [x] 순찰 시간 도달 시 자동 출발 확인
+  - [x] 순찰 복귀 후 설정 시간만큼 대기 가능
+  - [x] 종료 시각 이후 새 순찰을 시작하지 않는지 확인
+  - [x] 종료 요청 후 진행 중인 순찰 cycle 완료 및 home 복귀 처리
 - [x] 5. 원래 자리 복귀 완료
   - [x] home 위치 정의
   - [x] 순찰 완료 후 home 복귀 구현
@@ -63,7 +64,7 @@
 
 ### 현재 우선순위
 
-1. 결정된 특정 시간 순찰 정책을 scheduler 노드로 구현한다.
+1. 예약 순찰을 짧은 시간 창으로 재실행해 자동 출발, cycle 완료, home 복귀, 종료 로그를 증거로 남긴다.
 2. `mapping:=auto` 전체 흐름을 맵이 없는 상태부터 끝까지 재현 검증한다.
 3. 발표/시연용으로 Gazebo/RViz 실행 화면과 핵심 로그를 정리한다.
 4. 화재 감지 위치 기록과 웹/앱 연동 방식을 후속 작업으로 설계한다.
@@ -193,46 +194,49 @@ roslaunch night_patrol_robot patrol_one_button.launch mapping:=false
 
 ### 현재 상태
 
-스케줄 정책은 결정했고, 아직 스케줄러 노드는 구현 전이다. 현재 `patrol_waypoints_node.py`는 launch가 시작되면 바로 순찰 cycle을 시작하므로, 시간 기반 대기는 아직 실제 동작에 포함되지 않는다.
+`scheduled_patrol_node.py`와 `launch/scheduled_patrol.launch`가 구현되어 있다. 기본 진입점은 그대로 `patrol_one_button.launch`를 사용하며, `schedule_enabled:=true`를 주면 scheduler가 시간대를 판단해 순찰 launch를 시작한다.
 
-현재 검증 가능한 범위는 수동 `mapping:=false` 실행, waypoint 순찰, home 복귀, `patrol_loop` 반복 여부다.
+스케줄러는 Gazebo를 미리 띄울 수 있고(`preload_gazebo:=true`), 순찰 시간이 되면 실제 순찰 launch를 `use_gazebo:=false`로 시작해 Gazebo 중복 실행을 피한다.
 
 ### 결정된 운영 정책
 
-첫 순찰은 지정된 시작 시각에 출발한다. 이후 반복 순찰은 고정 시각표가 아니라 순찰을 마치고 home waypoint로 복귀한 시점을 기준으로 쉰 뒤 다시 출발한다.
+첫 순찰은 지정된 시작 시각에 출발한다. 이후 반복 순찰은 고정 시각표가 아니라 순찰 launch가 종료된 뒤 `rest_minutes_after_run`만큼 쉰 뒤 다시 출발한다.
 
-기본 종료 조건은 아침 종료 시각이다. 종료 시각 이후에는 새 순찰을 시작하지 않는다. `max_patrol_cycles`는 선택적 안전장치로 두고, 기본값은 횟수 제한 없음으로 둔다.
-개발/시연 중에는 실제 시작 시각까지 기다리지 않도록 명령어 옵션으로 즉시 첫 순찰을 강제할 수 있게 한다.
+기본 종료 조건은 아침 종료 시각이다. 종료 시각 이후에는 새 순찰을 시작하지 않는다. 이미 순찰 cycle이 진행 중이면 즉시 kill하지 않고 `/patrol_stop_requested`를 publish한다. `patrol_waypoints_node.py`는 현재 순찰 cycle을 끝까지 수행하고 home waypoint로 복귀한 뒤 `/patrol_finished`를 publish한다. scheduler는 이 신호를 받은 뒤 순찰 launch를 종료한다.
+
+`max_run_minutes`는 시연/안전용 보조 종료 조건이다. 값이 0보다 크면 실행 시간이 해당 분을 넘었을 때도 graceful stop을 요청한다. `graceful_stop_timeout_sec`는 종료 요청 후 cycle 완료와 home 복귀를 기다리는 최대 시간이다.
 
 ```text
-첫 순찰 시작: patrol_start_time
-반복 기준: 순찰 완료 및 home 복귀 후 patrol_rest_after_return_sec 대기
-종료 조건: patrol_end_time 이후 새 순찰 시작 금지
-보조 종료 조건: max_patrol_cycles > 0이면 해당 횟수 도달 시 종료
-테스트 시작: patrol_start_mode:=immediate 이면 시작 시각을 기다리지 않고 첫 순찰 시작
+첫 순찰 시작: start_time
+순찰 가능 창: start_time <= 현재 시각 < end_time, 자정 넘김 지원
+반복 기준: 순찰 launch 종료 후 rest_minutes_after_run 대기
+종료 조건: end_time 이후 새 순찰 시작 금지
+graceful stop: 진행 중인 순찰 cycle 완료 -> home 복귀 -> /patrol_finished -> launch 종료
+보조 종료 조건: max_run_minutes > 0이면 해당 실행 시간 도달 시 graceful stop 요청
+상시 허용 테스트: start_time과 end_time을 같게 설정
 ```
 
 프로젝트 기본값:
 
 ```text
-patrol_start_time: 23:00
-patrol_end_time: 07:00
-patrol_rest_after_return_sec: 30
-max_patrol_cycles: 0
+start_time: 22:00
+end_time: 06:00
+rest_minutes_after_run: 0
+max_run_minutes: 0
+graceful_stop_timeout_sec: 600
+preload_gazebo: true
 ```
 
-`patrol_rest_after_return_sec`는 현재 프로젝트 검증을 위해 30초로 둔다. 실제 운영에서는 3600초처럼 더 긴 값으로 늘릴 수 있다.
+`rest_minutes_after_run`은 반복 순찰이 필요할 때만 0보다 크게 둔다. `graceful_stop_timeout_sec`는 한 cycle과 home 복귀가 끝날 시간을 감안해 충분히 크게 둔다.
 
 예시 흐름:
 
 ```text
-23:00 첫 순찰 시작
-23:35 home 복귀 완료
-23:35:30 두 번째 순찰 시작
-00:10 home 복귀 완료
-00:10:30 세 번째 순찰 시작
+22:00 첫 순찰 시작
+22:35 home 복귀 완료 및 순찰 launch 종료
+22:45 rest_minutes_after_run:=10 이면 두 번째 순찰 시작
 ...
-07:00 이후 새 순찰 시작 안 함
+06:00 이후 새 순찰 시작 안 함
 ```
 
 이 정책은 순찰 시간이 예상보다 길어져도 다음 고정 시각과 충돌하지 않는다. 순찰 횟수보다 야간 시간대 커버를 우선하는 실무형 구성으로 본다.
@@ -245,48 +249,48 @@ max_patrol_cycles: 0
 -> 저장 맵 기반 순찰 시작
 -> 지정 waypoint 방문
 -> 시작 위치 또는 충전 위치로 복귀
--> 복귀 완료 시점부터 설정 시간만큼 대기
+-> 순찰 launch 종료
+-> 설정된 휴식 시간만큼 대기
 -> 종료 시각 전이면 다음 순찰 시작
 -> 종료 시각 이후이면 대기 상태 유지
 ```
 
-### 구현 방향
+### 실행
 
-- ROS param으로 `patrol_start_time`, `patrol_end_time`, `patrol_rest_after_return_sec`, `max_patrol_cycles`, `patrol_start_mode`를 설정한다.
-- 스케줄 판단은 별도 scheduler 노드 또는 `patrol_waypoints_node.py` 확장 중 하나로 담당한다.
-- 실제 순찰 cycle은 기존 waypoint 순찰과 home 복귀 로직을 재사용한다.
-- 수동 검증은 `patrol_start_mode:=immediate` launch arg로 첫 순찰을 바로 시작해 확인한다.
+```bash
+roslaunch night_patrol_robot patrol_one_button.launch schedule_enabled:=true start_time:=22:00 end_time:=06:00
+```
+
+짧은 시연은 항상 허용 시간 창과 최대 실행 시간을 함께 사용한다.
+
+```bash
+roslaunch night_patrol_robot patrol_one_button.launch schedule_enabled:=true start_time:=00:00 end_time:=00:00 max_run_minutes:=5 graceful_stop_timeout_sec:=600
+```
 
 ### 테스트 전략
 
-실제 23시까지 기다리지 않도록 테스트에서는 첫 순찰을 즉시 시작하고 반복 대기 시간을 30초로 둔다.
+실제 22시까지 기다리지 않도록 테스트에서는 `start_time`과 `end_time`을 같게 두어 항상 허용 창으로 만든 뒤 `max_run_minutes`로 graceful stop을 유도한다.
 
 ```text
-patrol_start_mode: immediate
-patrol_start_time: 23:00
-patrol_end_time: 07:00
-patrol_rest_after_return_sec: 30
-max_patrol_cycles: 3
+schedule_enabled: true
+start_time: 00:00
+end_time: 00:00
+max_run_minutes: 5
+graceful_stop_timeout_sec: 600
 ```
 
-경계값 검증을 위해 가짜 현재 시각 파라미터도 고려한다.
-
-```text
-patrol_test_now: 22:29
-patrol_test_now: 22:30
-patrol_test_now: 06:59
-patrol_test_now: 07:00
-```
+종료 창 경계는 실제 현재 시각 기준으로 `start_time`, `end_time`을 가까운 값으로 조정해 확인한다.
 
 ### 확인할 것
 
 - 순찰 시간이 아닐 때 로봇이 대기하는지 확인
 - 첫 순찰 시작 시각이 되면 waypoint 순찰이 시작되는지 확인
 - 순찰 완료 후 원래 자리 또는 home waypoint로 돌아오는지 확인
-- home 복귀 완료 후 `patrol_rest_after_return_sec`만큼 대기하는지 확인
+- home 복귀 완료 후 `rest_minutes_after_run`만큼 대기하는지 확인
 - 대기 후 종료 시각 전이면 다음 순찰을 시작하는지 확인
 - 종료 시각 이후에는 새 순찰을 시작하지 않는지 확인
-- `max_patrol_cycles`가 0보다 클 때 최대 순찰 횟수에서 멈추는지 확인
+- 종료 요청이 들어와도 현재 순찰 cycle을 마치고 home 복귀 후 종료하는지 확인
+- `max_run_minutes`가 0보다 클 때 graceful stop 요청이 들어오는지 확인
 
 ## Workflow 5. Home 복귀
 
@@ -422,7 +426,7 @@ roslaunch --files night_patrol_robot patrol_one_button.launch mapping:=false
 5. `mapping:=false`로 저장 맵 순찰 검증
 6. 순찰 완료 후 home 복귀 확인
 7. 화재 감지 후 정지, 경보, 해제, 순찰 재개 확인
-8. 특정 시간 순찰 scheduler 구현
+8. 특정 시간 순찰 scheduler 시간 압축 검증
 9. 원버튼 자동 실행 전체 시나리오 검증
 
 ## GitHub Issue 분리 기준

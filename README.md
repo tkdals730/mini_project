@@ -10,6 +10,7 @@ Gazebo 시뮬레이션 환경에서 TurtleBot3 Waffle Pi를 사용해 야간 순
 - 탐색 완료 후 자동 맵 저장 및 home waypoint 복귀
 - 저장된 맵, AMCL, `move_base`를 이용한 waypoint 순찰
 - 순찰 한 바퀴 완료 후 home waypoint 복귀 옵션 제공
+- `schedule_enabled:=true`로 지정 시간대에만 순찰을 시작하고, 종료 시각 이후에는 진행 중인 순찰 cycle을 마친 뒤 home 복귀 후 종료
 - 카메라 RGB 이미지에서 빨강/주황 계열을 감지하는 화재 감지 노드
 - 화재 후보가 일정 시간 이상 보이면 순찰을 일시 정지하고, 추가 확인 후 `/patrol_alert`를 publish하는 대응 노드
 - RViz 설정과 카메라 디버그 이미지 뷰어 실행 옵션 제공
@@ -106,6 +107,22 @@ roslaunch night_patrol_robot patrol_one_button.launch mapping:=false
 roslaunch night_patrol_robot patrol_one_button.launch mapping:=false map_file:=$(rospack find night_patrol_robot)/maps/patrol_map.yaml
 ```
 
+### 6. 예약 순찰 실행
+
+정해진 시간대에만 순찰을 시작하려면 `schedule_enabled:=true`를 사용합니다. 기본값은 `22:00`부터 `06:00`까지이며, 종료 시각이 지나면 새 순찰을 시작하지 않습니다. 이미 순찰 cycle이 진행 중이면 해당 cycle을 마치고 home waypoint로 복귀한 뒤 launch를 종료합니다.
+
+```bash
+roslaunch night_patrol_robot patrol_one_button.launch schedule_enabled:=true start_time:=22:00 end_time:=06:00
+```
+
+시연처럼 짧은 시간만 확인하려면 `max_run_minutes`와 `graceful_stop_timeout_sec`를 함께 조정합니다. `graceful_stop_timeout_sec`는 종료 요청 후 현재 순찰 cycle과 home 복귀를 기다리는 최대 시간입니다.
+
+```bash
+roslaunch night_patrol_robot patrol_one_button.launch schedule_enabled:=true start_time:=00:00 end_time:=00:00 max_run_minutes:=5 graceful_stop_timeout_sec:=600
+```
+
+`rest_minutes_after_run`을 주면 한 번 순찰이 끝난 뒤 같은 시간대 안에서 다음 순찰을 시작하기 전 대기 시간을 둘 수 있습니다.
+
 ### 자주 쓰는 옵션
 
 ```bash
@@ -117,6 +134,9 @@ roslaunch night_patrol_robot patrol_one_button.launch mapping:=false use_fire_de
 
 # 순찰을 한 바퀴만 실행
 roslaunch night_patrol_robot patrol_one_button.launch mapping:=false patrol_loop:=false
+
+# 예약 순찰에서 Gazebo를 미리 띄우고 시간대에 맞춰 순찰 launch만 시작
+roslaunch night_patrol_robot patrol_one_button.launch schedule_enabled:=true preload_gazebo:=true
 ```
 
 ## 실행 화면
@@ -130,6 +150,7 @@ roslaunch night_patrol_robot patrol_one_button.launch mapping:=false patrol_loop
 - `launch/gazebo_robot.launch`: Gazebo empty world 실행, TurtleBot3 URDF 로드, 로봇 spawn
 - `launch/patrol_one_button.launch`: 맵핑 모드와 순찰 모드를 하나의 launch에서 선택 실행
 - `launch/patrol_runtime.launch`: supervisor가 선택한 실제 맵핑/순찰 런타임 실행
+- `launch/scheduled_patrol.launch`: 예약 순찰 전용 scheduler 노드 실행
 - `launch/save_patrol_map.launch`: `/map` 토픽을 `maps/patrol_map`으로 저장
 
 ## 주요 노드
@@ -138,6 +159,7 @@ roslaunch night_patrol_robot patrol_one_button.launch mapping:=false patrol_loop
 - `scripts/auto_map_saver_node.py`: `/exploration_complete` 수신 시 맵 저장 후 home 복귀 goal 전송
 - `scripts/auto_explore_node.py`: LaserScan 기반의 간단한 벽 따라가기 탐색
 - `scripts/patrol_waypoints_node.py`: AMCL pose 수신 후 설정된 waypoint를 순서대로 순찰
+- `scripts/scheduled_patrol_node.py`: 순찰 가능 시간대와 휴식 시간을 판단해 순찰 launch를 시작/종료
 - `scripts/fire_detection_node.py`: `/camera/rgb/image_raw`를 받아 화재 후보 색상 영역을 감지하고 `/fire_detected`와 디버그 이미지를 publish
 - `scripts/fire_response_node.py`: `/fire_detected`를 시간 창 기준으로 판단해 순찰 정지, `/patrol_alert`, 화면 경고 상태를 publish
 
@@ -152,10 +174,11 @@ roslaunch night_patrol_robot patrol_one_button.launch mapping:=false patrol_loop
 - 화재 감지는 현재 Gazebo 테스트 오브젝트에 맞춘 색상 threshold 방식이며, 실제 화재 일반화 모델은 아직 아닙니다.
 - 화재 대응은 오탐을 줄이기 위해 즉시 경보가 아니라 `빠른 정지 -> 추가 확인 -> 경보 발행` 순서로 동작합니다.
 - Gazebo 테스트에서 화재 후보 감지 시 정지, 일정 시간 이상 감지 시 alert 표시, 화재 후보 해제 후 순찰 재개, home 복귀까지 확인했습니다.
+- 예약 순찰은 `schedule_enabled:=true`에서 지정 시간대 진입 시 자동 출발하고, 종료 요청 후 진행 중인 순찰 cycle을 마친 뒤 home 복귀와 launch 종료로 이어지도록 구현했습니다.
 
 ## 앞으로 구현해야 할 부분
 
-- 특정 시간 순찰 scheduler 또는 시작 트리거 추가
+- 예약 순찰 시간 압축 테스트와 실제 시연 로그/화면 증거 정리
 - 화재 감지 위치 기록과 웹/앱 연동용 rosbridge 또는 WebSocket 브리지 설계
 - `mapping:=auto` 기준으로 맵이 없는 상태부터 맵핑, 저장, home 복귀, 이후 순찰까지 전체 시나리오 재현 검증
 - 필요 시 `frontier_viewpoint_clearance_cells`, distance/obstacle penalty, home waypoint/tolerance 등 세부 튜닝 재검토
@@ -172,6 +195,7 @@ roslaunch night_patrol_robot patrol_one_button.launch mapping:=false patrol_loop
 - Gazebo spawn pose와 AMCL initial pose는 `spawn_*`, `initial_pose_*` launch arg로 분리되어 있습니다.
 - 화재 감지 디버그 이미지는 기본적으로 `/fire_detection/debug_image`에서 확인합니다.
 - 화재 대응 기본값은 최근 1.5초 중 0.25초 이상 감지 시 정지, 정지 후 최근 5초 중 2.5초 이상 감지 시 `/patrol_alert` 발행, 최근 5초 중 0.2초 이하로 떨어지면 해제입니다.
+- 예약 순찰 종료 요청은 `/patrol_stop_requested`로 전달되고, 순찰 노드는 한 cycle과 home 복귀를 마친 뒤 `/patrol_finished`를 publish합니다.
 
 ## Frontier 탐색 파라미터
 
