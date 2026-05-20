@@ -73,7 +73,7 @@ class ScheduledPatrolNode:
         self.rest_after_run = datetime.timedelta(
             minutes=max(0.0, rospy.get_param("~rest_minutes_after_run", 0.0))
         )
-        self.preload_gazebo = rospy.get_param("~preload_gazebo", False)
+        self.preload_gazebo = rospy.get_param("~preload_gazebo", True)
         self.patrol_cli_args, self.patrol_arg_values = _parse_launch_args(
             rospy.get_param("~patrol_launch_args", "")
         )
@@ -187,6 +187,9 @@ class ScheduledPatrolNode:
 
     def start_patrol(self):
         rospy.loginfo("Starting scheduled patrol.")
+        if self.preload_gazebo and self.gazebo_parent is None:
+            self.start_gazebo()
+
         self.stop_requested = False
         self.stop_requested_at = None
         self.patrol_finished = False
@@ -202,6 +205,7 @@ class ScheduledPatrolNode:
         cli_args = list(self.patrol_cli_args)
         if self.preload_gazebo:
             cli_args = _with_launch_arg(cli_args, "use_gazebo", "false")
+            rospy.loginfo("Scheduled patrol will reuse preloaded Gazebo.")
 
         self.parent = roslaunch.parent.ROSLaunchParent(self.uuid, [(launch_file, cli_args)])
         self.parent.start()

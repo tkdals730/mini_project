@@ -28,7 +28,7 @@ class PatrolWaypointsNode:
         self.marker_pub = rospy.Publisher(
             "/patrol_waypoints/markers", MarkerArray, queue_size=1, latch=True
         )
-        self.finished_pub = rospy.Publisher("/patrol_finished", Bool, queue_size=1, latch=True)
+        self.finished_pub = rospy.Publisher("/patrol_finished", Bool, queue_size=1)
 
         rospy.Subscriber("/amcl_pose", PoseWithCovarianceStamped, self._amcl_pose_callback)
         rospy.Subscriber("/patrol_pause", Bool, self._patrol_pause_callback, queue_size=1)
