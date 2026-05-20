@@ -68,6 +68,19 @@
 3. 발표/시연용으로 Gazebo/RViz 실행 화면과 핵심 로그를 정리한다.
 4. 화재 감지 위치 기록과 웹/앱 연동 방식을 후속 작업으로 설계한다.
 
+## 빠른 시연 흐름
+
+저장된 기준 맵이 있는 현재 상태에서는 다음 순서로 시연하는 것이 가장 안정적이다.
+
+```bash
+cd ~/catkin_ws
+catkin_make
+source devel/setup.bash
+roslaunch night_patrol_robot patrol_one_button.launch mapping:=false
+```
+
+시연에서 확인할 핵심 화면은 RViz의 `Patrol Waypoints` marker, 로봇의 waypoint 이동, `/fire_detection/debug_image`의 감지 표시다. 화면 부하가 크면 `use_camera_viewer:=false` 또는 `use_rviz:=false`를 붙여 한 화면씩 분리해서 확인한다.
+
 ## 전체 운영 흐름
 
 ```text
@@ -180,8 +193,9 @@ roslaunch night_patrol_robot patrol_one_button.launch mapping:=false
 
 ### 현재 상태
 
-스케줄 정책은 결정했고, 아직 스케줄러 노드는 구현 전이다.
-현재는 수동으로 `mapping:=false` 순찰 모드를 실행해 waypoint 순찰을 확인하는 단계다.
+스케줄 정책은 결정했고, 아직 스케줄러 노드는 구현 전이다. 현재 `patrol_waypoints_node.py`는 launch가 시작되면 바로 순찰 cycle을 시작하므로, 시간 기반 대기는 아직 실제 동작에 포함되지 않는다.
+
+현재 검증 가능한 범위는 수동 `mapping:=false` 실행, waypoint 순찰, home 복귀, `patrol_loop` 반복 여부다.
 
 ### 결정된 운영 정책
 
@@ -239,7 +253,7 @@ max_patrol_cycles: 0
 ### 구현 방향
 
 - ROS param으로 `patrol_start_time`, `patrol_end_time`, `patrol_rest_after_return_sec`, `max_patrol_cycles`, `patrol_start_mode`를 설정한다.
-- 스케줄 판단은 `patrol_waypoints_node.py` 또는 별도 scheduler 노드에서 담당한다.
+- 스케줄 판단은 별도 scheduler 노드 또는 `patrol_waypoints_node.py` 확장 중 하나로 담당한다.
 - 실제 순찰 cycle은 기존 waypoint 순찰과 home 복귀 로직을 재사용한다.
 - 수동 검증은 `patrol_start_mode:=immediate` launch arg로 첫 순찰을 바로 시작해 확인한다.
 
@@ -364,12 +378,40 @@ roslaunch night_patrol_robot patrol_one_button.launch
 -> home 복귀
 ```
 
+### 현재 구현
+
+`patrol_one_button.launch`는 `patrol_launch_supervisor.py`만 직접 실행한다. supervisor는 `mapping:=auto`, `mapping:=true`, `mapping:=false` 값을 해석한 뒤 실제 실행 파일인 `patrol_runtime.launch`를 같은 인자로 다시 실행한다.
+
+```text
+mapping:=auto
+-> maps/patrol_map.yaml 존재 여부 확인
+-> 없으면 patrol_runtime.launch mapping:=true
+-> 있으면 patrol_runtime.launch mapping:=false
+```
+
 ### 확인할 것
 
 - `mapping:=auto`에서 맵 파일 존재 여부를 기준으로 모드가 선택되는지 확인
 - `mapping:=true`로 강제 맵핑이 되는지 확인
 - `mapping:=false`로 강제 순찰이 되는지 확인
 - RViz, 카메라 뷰어, 화재 감지를 arg로 끄고 켤 수 있는지 확인
+
+### 빠른 확인 명령
+
+실제 Gazebo를 오래 띄우기 전에 XML과 Python 문법을 먼저 확인한다.
+
+```bash
+python3 -m py_compile scripts/patrol_launch_supervisor.py scripts/patrol_waypoints_node.py scripts/frontier_explore_node.py
+xmllint --noout launch/patrol_one_button.launch launch/patrol_runtime.launch
+```
+
+ROS 환경에서는 launch 파일 해석이 되는지 확인한다.
+
+```bash
+source /opt/ros/noetic/setup.bash
+source ~/catkin_ws/devel/setup.bash
+roslaunch --files night_patrol_robot patrol_one_button.launch mapping:=false
+```
 
 ## 권장 검증 순서
 
@@ -379,8 +421,8 @@ roslaunch night_patrol_robot patrol_one_button.launch
 4. 맵 저장 후 home 복귀 확인
 5. `mapping:=false`로 저장 맵 순찰 검증
 6. 순찰 완료 후 home 복귀 확인
-7. 특정 시간 순찰 scheduler 설계
-8. 화재 감지 후 경보/정지/알림 정책 결정
+7. 화재 감지 후 정지, 경보, 해제, 순찰 재개 확인
+8. 특정 시간 순찰 scheduler 구현
 9. 원버튼 자동 실행 전체 시나리오 검증
 
 ## GitHub Issue 분리 기준

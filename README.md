@@ -33,6 +33,19 @@ night_patrol_robot/
 
 전체 운영/검증 흐름은 `docs/workflows.md`에 정리되어 있습니다.
 
+### 빠른 시작
+
+이미 저장된 기준 맵(`maps/patrol_map.yaml`)이 있는 상태에서 순찰, waypoint marker, 화재 감지 디버그 화면까지 바로 확인하려면 다음 명령을 사용합니다.
+
+```bash
+cd ~/catkin_ws
+catkin_make
+source devel/setup.bash
+roslaunch night_patrol_robot patrol_one_button.launch mapping:=false
+```
+
+맵을 처음부터 다시 만들고 싶으면 기존 맵 파일을 따로 백업하거나 삭제한 뒤 기본 자동 모드를 실행하거나, `mapping:=true`로 맵핑 모드를 강제 실행합니다.
+
 ### 1. 빌드 및 환경 설정
 
 ```bash
@@ -106,10 +119,17 @@ roslaunch night_patrol_robot patrol_one_button.launch mapping:=false use_fire_de
 roslaunch night_patrol_robot patrol_one_button.launch mapping:=false patrol_loop:=false
 ```
 
+## 실행 화면
+
+| 자동 waypoint | waypoint 이동 | 화재 경보 |
+| --- | --- | --- |
+| ![자동 waypoint](screenshoots/auto_waypoint.png) | ![waypoint 이동](screenshoots/go_waypoint.png) | ![화재 경보](screenshoots/fire_alter.png) |
+
 ## 주요 launch 파일
 
 - `launch/gazebo_robot.launch`: Gazebo empty world 실행, TurtleBot3 URDF 로드, 로봇 spawn
 - `launch/patrol_one_button.launch`: 맵핑 모드와 순찰 모드를 하나의 launch에서 선택 실행
+- `launch/patrol_runtime.launch`: supervisor가 선택한 실제 맵핑/순찰 런타임 실행
 - `launch/save_patrol_map.launch`: `/map` 토픽을 `maps/patrol_map`으로 저장
 
 ## 주요 노드
@@ -141,7 +161,7 @@ roslaunch night_patrol_robot patrol_one_button.launch mapping:=false patrol_loop
 - 필요 시 `frontier_viewpoint_clearance_cells`, distance/obstacle penalty, home waypoint/tolerance 등 세부 튜닝 재검토
 - ROS launch smoke test 또는 간단한 노드 단위 테스트 추가
 - `package.xml`의 license, maintainer metadata 정리
-- README에 실행 화면, 맵 예시, 화재 감지 디버그 이미지 추가
+- README에 맵 예시 이미지 추가
 
 ## 개발 메모
 
@@ -180,3 +200,20 @@ roslaunch night_patrol_robot patrol_one_button.launch mapping:=false patrol_loop
 - `frontier_suppress_reached_frontier`: 성공한 frontier 영역도 suppress할지 여부
 - `frontier_force_completion_after_repeated_failures`: 맵 증가가 멈춘 뒤 반복 실패 frontier가 충분히 suppress되면 완료로 빠질지 여부
 - `exploration_complete_wait_sec`: reachable frontier가 없을 때 탐색 완료로 판단하기 전 대기 시간
+
+## 최소 검증 명령
+
+문서와 launch 설정을 바꾼 뒤에는 다음 순서로 빠르게 확인합니다.
+
+```bash
+python3 -m py_compile scripts/patrol_launch_supervisor.py scripts/patrol_waypoints_node.py scripts/frontier_explore_node.py
+xmllint --noout launch/patrol_one_button.launch launch/patrol_runtime.launch
+```
+
+ROS 환경까지 확인할 수 있으면 아래 명령으로 실제 launch 인자 해석을 검증합니다.
+
+```bash
+source /opt/ros/noetic/setup.bash
+source ~/catkin_ws/devel/setup.bash
+roslaunch --files night_patrol_robot patrol_one_button.launch mapping:=false
+```
