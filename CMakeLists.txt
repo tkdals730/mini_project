@@ -11,6 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
   actionlib
   actionlib_msgs
   cv_bridge
+  gazebo_msgs
   geometry_msgs
   move_base_msgs
   nav_msgs
@@ -170,6 +171,7 @@ include_directories(
 catkin_install_python(PROGRAMS
   scripts/auto_explore_node.py
   scripts/auto_map_saver_node.py
+  scripts/cmd_vel_safety_node.py
   scripts/fire_detection_node.py
   scripts/fire_response_node.py
   scripts/frontier_explore_node.py

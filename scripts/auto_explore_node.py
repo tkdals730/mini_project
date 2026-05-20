@@ -3,10 +3,12 @@ import math
 import rospy
 from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import Twist
+from std_msgs.msg import Bool
 
 front = 999.0
 left = 999.0
 right = 999.0
+patrol_paused = False
 
 
 def clamp(value, low, high):
@@ -40,11 +42,18 @@ def scan_callback(msg):
     right = _sector_min(msg, -math.pi / 2.0, half_width_rad=0.35)
 
 
+def patrol_pause_callback(msg):
+    global patrol_paused
+    patrol_paused = bool(msg.data)
+
+
 def main():
     rospy.init_node("auto_explore_node")
 
     rospy.Subscriber("/scan", LaserScan, scan_callback)
-    pub = rospy.Publisher("/cmd_vel", Twist, queue_size=10)
+    rospy.Subscriber("/patrol_pause", Bool, patrol_pause_callback, queue_size=1)
+    cmd_vel_topic = rospy.get_param("~cmd_vel_topic", "/cmd_vel")
+    pub = rospy.Publisher(cmd_vel_topic, Twist, queue_size=10)
 
     rate = rospy.Rate(10)
 
@@ -58,7 +67,9 @@ def main():
     while not rospy.is_shutdown():
         cmd = Twist()
 
-        if front < FRONT_DANGER:
+        if patrol_paused:
+            pass
+        elif front < FRONT_DANGER:
             cmd.linear.x = -0.10
             cmd.angular.z = 0.9 if left > right else -0.9
 

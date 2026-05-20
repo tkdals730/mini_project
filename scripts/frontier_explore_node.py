@@ -37,6 +37,7 @@ class FrontierExploreNode:
         self.best_free_cell_count = 0
         self.suppressed_frontier_events = 0
         self.exploration_complete_published = False
+        self.patrol_paused = False
 
         # 같은 goal에 너무 오래 묶이지 않게 해서, 막힌 구역이면 빨리 다른 frontier를 보게 한다.
         self.goal_timeout = rospy.Duration(rospy.get_param("~goal_timeout_sec", 8.0))
@@ -99,11 +100,13 @@ class FrontierExploreNode:
             rospy.get_param("~exploration_complete_wait_sec", 15.0)
         )
 
-        self.cmd_vel_pub = rospy.Publisher("/cmd_vel", Twist, queue_size=1)
+        self.cmd_vel_topic = rospy.get_param("~cmd_vel_topic", "/cmd_vel")
+        self.cmd_vel_pub = rospy.Publisher(self.cmd_vel_topic, Twist, queue_size=1)
         self.exploration_complete_pub = rospy.Publisher(
             "/exploration_complete", Bool, queue_size=1, latch=True
         )
         rospy.Subscriber("/map", OccupancyGrid, self._map_callback)
+        rospy.Subscriber("/patrol_pause", Bool, self._patrol_pause_callback, queue_size=1)
 
         rospy.loginfo("Waiting for move_base action server for frontier exploration...")
         if not self.move_base.wait_for_server(rospy.Duration(20.0)):
@@ -122,6 +125,21 @@ class FrontierExploreNode:
                 free_cells,
                 self.free_cell_growth_threshold,
             )
+
+    def _patrol_pause_callback(self, msg):
+        paused = bool(msg.data)
+        if paused == self.patrol_paused:
+            return
+
+        self.patrol_paused = paused
+        if paused:
+            rospy.logwarn("Frontier exploration paused by fire response.")
+            self.move_base.cancel_goal()
+            self.current_goal = None
+            self.current_frontier = None
+            self.cmd_vel_pub.publish(Twist())
+        else:
+            rospy.loginfo("Frontier exploration pause cleared.")
 
     def _get_robot_pose(self):
         self.tf_listener.waitForTransform("map", "base_footprint", rospy.Time(0), rospy.Duration(1.0))
@@ -568,7 +586,11 @@ class FrontierExploreNode:
         cmd = Twist()
         cmd.angular.z = angular_speed
 
-        while not rospy.is_shutdown() and rospy.Time.now() < end_time:
+        while (
+            not rospy.is_shutdown()
+            and not self.patrol_paused
+            and rospy.Time.now() < end_time
+        ):
             self.cmd_vel_pub.publish(cmd)
             rate.sleep()
 
@@ -705,6 +727,15 @@ class FrontierExploreNode:
                 continue
             self.current_robot_x = robot_x
             self.current_robot_y = robot_y
+
+            if self.patrol_paused:
+                if self.current_goal is not None:
+                    self.move_base.cancel_goal()
+                    self.current_goal = None
+                    self.current_frontier = None
+                self.cmd_vel_pub.publish(Twist())
+                rate.sleep()
+                continue
 
             self._handle_goal_state()
 
