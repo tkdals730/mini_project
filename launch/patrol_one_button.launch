@@ -33,7 +33,6 @@
   <!-- rviz 설정 -->
   <arg name="rviz_config" default="$(find night_patrol_robot)/rviz/patrol.rviz" />
   <!-- 맵 설정 -->
-  <!-- <arg name="world_name" default="$(find night_patrol_robot)/worlds/office_patrol_nov4.world" /> -->
   <arg name="world_name" default="$(find night_patrol_robot)/worlds/office_patrolv4.world" />
   <arg name="frontier_goal_timeout_sec" default="25.0" />
   <arg name="frontier_min_goal_distance" default="0.4" />

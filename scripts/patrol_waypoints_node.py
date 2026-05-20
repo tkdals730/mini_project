@@ -23,6 +23,7 @@ class PatrolWaypointsNode:
         self.client = actionlib.SimpleActionClient("move_base", MoveBaseAction)
         self.initial_pose_received = False
         self.patrol_paused = False
+        self.pause_generation = 0
         self.marker_pub = rospy.Publisher(
             "/patrol_waypoints/markers", MarkerArray, queue_size=1, latch=True
         )
@@ -77,6 +78,7 @@ class PatrolWaypointsNode:
         if paused != self.patrol_paused:
             self.patrol_paused = paused
             if paused:
+                self.pause_generation += 1
                 rospy.logwarn("Patrol paused by fire response.")
             else:
                 rospy.loginfo("Patrol pause cleared. Continuing patrol.")
@@ -272,6 +274,7 @@ class PatrolWaypointsNode:
         goal = self._build_goal(waypoint)
         while not rospy.is_shutdown():
             self._wait_while_paused()
+            pause_generation_at_send = self.pause_generation
             rospy.loginfo(
                 "Sending %s: x=%.2f y=%.2f yaw=%.2f",
                 label,
@@ -290,7 +293,14 @@ class PatrolWaypointsNode:
                     break
 
                 if self.client.wait_for_result(rospy.Duration(0.2)):
-                    return self.client.get_state()
+                    state = self.client.get_state()
+                    if self._was_interrupted_by_pause(state, pause_generation_at_send):
+                        rospy.logwarn(
+                            "%s was canceled during patrol pause. It will be retried after pause clears.",
+                            label,
+                        )
+                        break
+                    return state
 
                 if rospy.Time.now() >= deadline:
                     self.client.cancel_goal()
@@ -302,6 +312,11 @@ class PatrolWaypointsNode:
 
         return GoalStatus.PREEMPTED
 
+    def _was_interrupted_by_pause(self, state, pause_generation_at_send):
+        if state not in (GoalStatus.PREEMPTED, GoalStatus.RECALLED):
+            return False
+        return self.patrol_paused or self.pause_generation != pause_generation_at_send
+
     def _wait_while_paused(self):
         rate = rospy.Rate(5)
         while not rospy.is_shutdown() and self.patrol_paused:
@@ -311,7 +326,13 @@ class PatrolWaypointsNode:
         wait_sec = waypoint.get("wait_sec", self.wait_after_goal_sec)
         if wait_sec > 0.0:
             rospy.loginfo("%s reached. Waiting %.1f seconds for inspection.", label, wait_sec)
-            rospy.sleep(wait_sec)
+            end_time = rospy.Time.now() + rospy.Duration(wait_sec)
+            rate = rospy.Rate(10)
+            while not rospy.is_shutdown() and rospy.Time.now() < end_time:
+                if self.patrol_paused:
+                    self._wait_while_paused()
+                else:
+                    rate.sleep()
 
     def _return_home(self, cycle_index, reason):
         if not self.return_home_enabled or not self._has_home_waypoint():

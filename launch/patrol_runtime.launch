@@ -118,6 +118,17 @@
     <param name="clear_max_sec" value="$(arg fire_clear_max_sec)" />
   </node>
 
+  <node pkg="night_patrol_robot"
+        type="cmd_vel_safety_node.py"
+        name="cmd_vel_safety_node"
+        output="screen">
+    <param name="input_topic" value="/cmd_vel_nav" />
+    <param name="output_topic" value="/cmd_vel" />
+    <param name="pause_topic" value="/patrol_pause" />
+    <param name="hard_brake_enabled" value="true" />
+    <param name="hard_brake_model" value="turtlebot3_waffle_pi" />
+  </node>
+
   <!-- 초기 맵핑 모드 -->
   <group if="$(arg mapping)">
     <node pkg="gmapping" type="slam_gmapping" name="slam_gmapping" output="screen">
@@ -133,7 +144,9 @@
     <rosparam command="load" file="$(find night_patrol_robot)/config/global_costmap.yaml" ns="move_base/global_costmap" />
     <rosparam command="load" file="$(find night_patrol_robot)/config/local_costmap.yaml" ns="move_base/local_costmap" />
     <rosparam command="load" file="$(find night_patrol_robot)/config/move_base.yaml" ns="move_base" />
-    <node pkg="move_base" type="move_base" name="move_base" output="screen" />
+    <node pkg="move_base" type="move_base" name="move_base" output="screen">
+      <remap from="cmd_vel" to="/cmd_vel_nav" />
+    </node>
 
     <node pkg="night_patrol_robot"
           type="auto_map_saver_node.py"
@@ -196,6 +209,7 @@
         <param name="free_cell_growth_threshold" value="$(arg frontier_free_cell_growth_threshold)" />
         <param name="min_suppressed_frontiers_for_completion" value="$(arg frontier_min_suppressed_for_completion)" />
         <param name="force_completion_after_repeated_failures" value="$(arg frontier_force_completion_after_repeated_failures)" />
+        <param name="cmd_vel_topic" value="/cmd_vel_nav" />
       </node>
     </group>
 
@@ -203,7 +217,9 @@
       <node pkg="night_patrol_robot"
             type="auto_explore_node.py"
             name="auto_explore_node"
-            output="screen" />
+            output="screen">
+        <param name="cmd_vel_topic" value="/cmd_vel_nav" />
+      </node>
     </group>
   </group>
 
@@ -239,7 +255,9 @@
     <rosparam command="load" file="$(find night_patrol_robot)/config/global_costmap.yaml" ns="move_base/global_costmap" />
     <rosparam command="load" file="$(find night_patrol_robot)/config/local_costmap.yaml" ns="move_base/local_costmap" />
     <rosparam command="load" file="$(find night_patrol_robot)/config/move_base.yaml" ns="move_base" />
-    <node pkg="move_base" type="move_base" name="move_base" output="screen" />
+    <node pkg="move_base" type="move_base" name="move_base" output="screen">
+      <remap from="cmd_vel" to="/cmd_vel_nav" />
+    </node>
 
     <node pkg="night_patrol_robot"
           type="patrol_waypoints_node.py"

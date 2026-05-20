@@ -22,7 +22,10 @@ class FireResponseNode:
         self.alert_required_sec = self.alert_required.to_sec()
         self.clear_window_sec = self.clear_window.to_sec()
         self.clear_max_sec = self.clear_max.to_sec()
-        self.update_rate_hz = rospy.get_param("~update_rate_hz", 10.0)
+        self.update_rate_hz = rospy.get_param("~update_rate_hz", 20.0)
+        self.cancel_interval = rospy.Duration(
+            rospy.get_param("~cancel_interval_sec", 0.25)
+        )
         self.alert_repeat_interval = rospy.Duration(
             rospy.get_param("~alert_repeat_interval_sec", 3.0)
         )
@@ -139,7 +142,7 @@ class FireResponseNode:
         alert_active = self.state == "alert"
         if paused:
             self.cmd_vel_pub.publish(Twist())
-            if now - self.last_cancel_time >= rospy.Duration(1.0):
+            if now - self.last_cancel_time >= self.cancel_interval:
                 self._cancel_move_base(now)
         self._publish_state(paused, alert_active)
 
