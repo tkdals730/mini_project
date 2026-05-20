@@ -225,9 +225,12 @@ rest_minutes_after_run: 0
 max_run_minutes: 0
 graceful_stop_timeout_sec: 600
 preload_gazebo: true
+reset_gazebo_pose_on_start: true
 ```
 
 `rest_minutes_after_run`은 반복 순찰이 필요할 때만 0보다 크게 둔다. `graceful_stop_timeout_sec`는 한 cycle과 home 복귀가 끝날 시간을 감안해 충분히 크게 둔다.
+
+Gazebo를 유지한 채 순찰 launch만 재시작하면 실제 모델 pose와 새 AMCL 초기 pose가 어긋날 수 있다. 예약 순찰 시작 직전에는 기본적으로 `/gazebo/set_model_state`를 호출해 `turtlebot3_waffle_pi` 모델을 `initial_pose_x`, `initial_pose_y`, `initial_pose_yaw`, `spawn_z` 기준으로 reset한다. 실제 로봇이나 외부 Gazebo를 건드리지 않아야 하는 환경에서는 `reset_gazebo_pose_on_start:=false`로 끈다.
 
 예시 흐름:
 
@@ -291,6 +294,8 @@ graceful_stop_timeout_sec: 600
 - 종료 시각 이후에는 새 순찰을 시작하지 않는지 확인
 - 종료 요청이 들어와도 현재 순찰 cycle을 마치고 home 복귀 후 종료하는지 확인
 - `max_run_minutes`가 0보다 클 때 graceful stop 요청이 들어오는지 확인
+- 다음 예약 순찰 시작 직전에 Gazebo model pose reset 로그가 출력되는지 확인
+- reset 후 `/gazebo/model_states`의 `turtlebot3_waffle_pi` pose와 AMCL 초기 pose 기준값이 맞는지 확인
 
 ## Workflow 5. Home 복귀
 

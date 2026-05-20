@@ -123,6 +123,8 @@ roslaunch night_patrol_robot patrol_one_button.launch schedule_enabled:=true sta
 
 `rest_minutes_after_run`을 주면 한 번 순찰이 끝난 뒤 같은 시간대 안에서 다음 순찰을 시작하기 전 대기 시간을 둘 수 있습니다.
 
+예약 순찰은 Gazebo를 유지한 채 순찰 launch만 재시작할 수 있으므로, 다음 순찰 시작 직전에 `reset_gazebo_pose_on_start:=true`로 Gazebo 모델 pose를 `initial_pose_*` 기준에 맞춥니다. 이 옵션은 시뮬레이션 안정화용이며 실제 로봇 환경에서는 끄는 것이 안전합니다.
+
 ### 자주 쓰는 옵션
 
 ```bash
@@ -137,6 +139,9 @@ roslaunch night_patrol_robot patrol_one_button.launch mapping:=false patrol_loop
 
 # 예약 순찰에서 Gazebo를 미리 띄우고 시간대에 맞춰 순찰 launch만 시작
 roslaunch night_patrol_robot patrol_one_button.launch schedule_enabled:=true preload_gazebo:=true
+
+# 실제 로봇 또는 외부 Gazebo를 건드리지 않을 때 pose reset 비활성화
+roslaunch night_patrol_robot patrol_one_button.launch schedule_enabled:=true reset_gazebo_pose_on_start:=false
 ```
 
 ## 실행 화면
@@ -196,6 +201,7 @@ roslaunch night_patrol_robot patrol_one_button.launch schedule_enabled:=true pre
 - 화재 감지 디버그 이미지는 기본적으로 `/fire_detection/debug_image`에서 확인합니다.
 - 화재 대응 기본값은 최근 1.5초 중 0.25초 이상 감지 시 정지, 정지 후 최근 5초 중 2.5초 이상 감지 시 `/patrol_alert` 발행, 최근 5초 중 0.2초 이하로 떨어지면 해제입니다.
 - 예약 순찰 종료 요청은 `/patrol_stop_requested`로 전달되고, 순찰 노드는 한 cycle과 home 복귀를 마친 뒤 `/patrol_finished`를 publish합니다.
+- 예약 순찰 시작 전 Gazebo 모델 pose reset은 `/gazebo/set_model_state`를 사용하며, 기본 모델명은 `turtlebot3_waffle_pi`입니다.
 
 ## Frontier 탐색 파라미터
 

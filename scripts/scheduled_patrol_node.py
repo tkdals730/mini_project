@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 import datetime
+import math
 import shlex
 
+from gazebo_msgs.msg import ModelState
+from gazebo_msgs.srv import SetModelState
+from geometry_msgs.msg import Quaternion, Twist
 import roslaunch
 import rospy
 from std_msgs.msg import Bool
+from tf.transformations import quaternion_from_euler
 
 
 def _param_as_launch_value(name):
@@ -53,6 +58,13 @@ def _with_launch_arg(args, name, value):
     return [arg for arg in args if not arg.startswith(prefix)] + [prefix + str(value)]
 
 
+def _as_float(values, name, default):
+    try:
+        return float(values.get(name, default))
+    except (TypeError, ValueError):
+        return float(default)
+
+
 class ScheduledPatrolNode:
     def __init__(self):
         self.start_time = _parse_time(rospy.get_param("~start_time", "22:00"), "start_time")
@@ -74,6 +86,12 @@ class ScheduledPatrolNode:
             minutes=max(0.0, rospy.get_param("~rest_minutes_after_run", 0.0))
         )
         self.preload_gazebo = rospy.get_param("~preload_gazebo", True)
+        self.reset_gazebo_pose_on_start = rospy.get_param(
+            "~reset_gazebo_pose_on_start", True
+        )
+        self.gazebo_model_name = rospy.get_param(
+            "~gazebo_model_name", "turtlebot3_waffle_pi"
+        )
         self.patrol_cli_args, self.patrol_arg_values = _parse_launch_args(
             rospy.get_param("~patrol_launch_args", "")
         )
@@ -185,6 +203,46 @@ class ScheduledPatrolNode:
         )
         self.gazebo_parent.start()
 
+    def _build_reset_model_state(self):
+        x = _as_float(self.patrol_arg_values, "initial_pose_x", 0.0)
+        y = _as_float(self.patrol_arg_values, "initial_pose_y", 0.55)
+        z = _as_float(self.patrol_arg_values, "spawn_z", 0.01)
+        yaw = _as_float(self.patrol_arg_values, "initial_pose_yaw", math.pi / 2.0)
+        qx, qy, qz, qw = quaternion_from_euler(0.0, 0.0, yaw)
+
+        state = ModelState()
+        state.model_name = self.gazebo_model_name
+        state.pose.position.x = x
+        state.pose.position.y = y
+        state.pose.position.z = z
+        state.pose.orientation = Quaternion(x=qx, y=qy, z=qz, w=qw)
+        state.twist = Twist()
+        state.reference_frame = "world"
+        return state
+
+    def reset_gazebo_pose(self):
+        if not self.reset_gazebo_pose_on_start:
+            return
+        if not self.preload_gazebo:
+            rospy.logwarn(
+                "Skipping Gazebo pose reset because preload_gazebo is disabled."
+            )
+            return
+
+        try:
+            rospy.wait_for_service("/gazebo/set_model_state", timeout=10.0)
+            set_model_state = rospy.ServiceProxy("/gazebo/set_model_state", SetModelState)
+            response = set_model_state(self._build_reset_model_state())
+            if response.success:
+                rospy.loginfo(
+                    "Reset Gazebo model '%s' pose before scheduled patrol start.",
+                    self.gazebo_model_name,
+                )
+            else:
+                rospy.logwarn("Gazebo pose reset failed: %s", response.status_message)
+        except (rospy.ROSException, rospy.ServiceException) as exc:
+            rospy.logwarn("Gazebo pose reset skipped: %s", exc)
+
     def start_patrol(self):
         rospy.loginfo("Starting scheduled patrol.")
         if self.preload_gazebo and self.gazebo_parent is None:
@@ -194,6 +252,7 @@ class ScheduledPatrolNode:
         self.stop_requested_at = None
         self.patrol_finished = False
         self.stop_request_pub.publish(Bool(data=False))
+        self.reset_gazebo_pose()
         self.pause_pub.publish(Bool(data=False))
         self.run_started_at = datetime.datetime.now()
 
