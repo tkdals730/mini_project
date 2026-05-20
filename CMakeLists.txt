@@ -178,6 +178,7 @@ catkin_install_python(PROGRAMS
   scripts/generate_patrol_waypoints.py
   scripts/patrol_launch_supervisor.py
   scripts/patrol_waypoints_node.py
+  scripts/scheduled_patrol_node.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

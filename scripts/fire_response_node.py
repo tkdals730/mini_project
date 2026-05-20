@@ -151,7 +151,8 @@ class FireResponseNode:
         self.move_base_cancel_pub.publish(GoalID())
 
     def _publish_state(self, paused, alert_active):
-        self.pause_pub.publish(Bool(data=paused))
+        if self.last_pause is None or paused != self.last_pause:
+            self.pause_pub.publish(Bool(data=paused))
         self.alert_active_pub.publish(Bool(data=alert_active))
         self.last_pause = paused
         self.last_alert_active = alert_active

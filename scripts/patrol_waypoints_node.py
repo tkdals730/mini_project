@@ -23,13 +23,18 @@ class PatrolWaypointsNode:
         self.client = actionlib.SimpleActionClient("move_base", MoveBaseAction)
         self.initial_pose_received = False
         self.patrol_paused = False
+        self.stop_requested = False
         self.pause_generation = 0
         self.marker_pub = rospy.Publisher(
             "/patrol_waypoints/markers", MarkerArray, queue_size=1, latch=True
         )
+        self.finished_pub = rospy.Publisher("/patrol_finished", Bool, queue_size=1, latch=True)
 
         rospy.Subscriber("/amcl_pose", PoseWithCovarianceStamped, self._amcl_pose_callback)
         rospy.Subscriber("/patrol_pause", Bool, self._patrol_pause_callback, queue_size=1)
+        rospy.Subscriber(
+            "/patrol_stop_requested", Bool, self._stop_requested_callback, queue_size=1
+        )
 
         self.loop_enabled = rospy.get_param("~patrol_loop", True)
         self.return_home_enabled = rospy.get_param("~return_home", True)
@@ -79,9 +84,18 @@ class PatrolWaypointsNode:
             self.patrol_paused = paused
             if paused:
                 self.pause_generation += 1
-                rospy.logwarn("Patrol paused by fire response.")
+                rospy.logwarn("Patrol paused.")
             else:
                 rospy.loginfo("Patrol pause cleared. Continuing patrol.")
+
+    def _stop_requested_callback(self, msg):
+        requested = bool(msg.data)
+        if requested != self.stop_requested:
+            self.stop_requested = requested
+            if requested:
+                rospy.loginfo(
+                    "Scheduled patrol stop requested. Current patrol cycle will finish before returning home."
+                )
 
     def _load_waypoints_from_file(self, path):
         if not path:
@@ -89,12 +103,12 @@ class PatrolWaypointsNode:
             return []
 
         expanded_path = os.path.expanduser(path)
-        wait_until = rospy.Time.now() + rospy.Duration(self.waypoints_file_wait_sec)
+        wait_until = time.time() + self.waypoints_file_wait_sec
         while (
             not rospy.is_shutdown()
             and self.waypoints_file_wait_sec > 0.0
             and not self._waypoints_file_ready(expanded_path)
-            and rospy.Time.now() < wait_until
+            and time.time() < wait_until
         ):
             rospy.sleep(0.1)
 
@@ -288,7 +302,7 @@ class PatrolWaypointsNode:
             while not rospy.is_shutdown():
                 if self.patrol_paused:
                     self.client.cancel_goal()
-                    rospy.logwarn("%s canceled while fire response is active.", label)
+                    rospy.logwarn("%s canceled while patrol pause is active.", label)
                     self.client.wait_for_result(rospy.Duration(2.0))
                     break
 
@@ -363,6 +377,7 @@ class PatrolWaypointsNode:
     def run(self):
         waypoint_count = len(self.waypoints)
         cycle_index = 0
+        self.finished_pub.publish(Bool(data=False))
 
         while not rospy.is_shutdown():
             cycle_index += 1
@@ -381,15 +396,24 @@ class PatrolWaypointsNode:
                         state,
                     )
                     self._return_home(cycle_index, "waypoint %d failed" % index)
+                    self.finished_pub.publish(Bool(data=True))
                     break
 
                 self._wait_at_waypoint(waypoint, "Waypoint %d" % index)
             else:
                 rospy.loginfo("Patrol cycle %d completed.", cycle_index)
                 self._return_home(cycle_index, "patrol cycle completed")
+                self.finished_pub.publish(Bool(data=True))
+                if self.stop_requested:
+                    rospy.loginfo("Scheduled stop request completed after patrol cycle %d.", cycle_index)
+                    return
 
             if not self.loop_enabled:
                 rospy.loginfo("Patrol loop disabled, stopping after one cycle.")
+                return
+
+            if self.stop_requested:
+                rospy.loginfo("Scheduled stop request accepted between patrol cycles.")
                 return
 
             rospy.sleep(1.0)
@@ -397,7 +421,10 @@ class PatrolWaypointsNode:
 
 def main():
     rospy.init_node("patrol_waypoints_node")
-    PatrolWaypointsNode().run()
+    try:
+        PatrolWaypointsNode().run()
+    except rospy.ROSInterruptException:
+        pass
 
 
 if __name__ == "__main__":

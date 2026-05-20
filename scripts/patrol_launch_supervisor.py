@@ -55,6 +55,7 @@ class PatrolLaunchSupervisor:
             "return_home",
             "patrol_wait_sec",
             "patrol_goal_timeout_sec",
+            "use_gazebo",
             "use_rviz",
             "use_camera_viewer",
             "use_fire_detection",
