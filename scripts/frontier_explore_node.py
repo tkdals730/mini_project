@@ -25,6 +25,7 @@ class FrontierExploreNode:
         self.move_base = actionlib.SimpleActionClient("move_base", MoveBaseAction)
         self.blacklist = []
         self.frontier_blacklist = []
+        self.blocked_frontier_sectors = []
         self.current_goal = None
         self.current_frontier = None
         self.goal_failure_counts = {}
@@ -48,6 +49,10 @@ class FrontierExploreNode:
         # 한 번 실패한 지점 주변은 잠시 제외해서 같은 실패를 반복하지 않게 한다.
         self.blacklist_radius = rospy.get_param("~blacklist_radius", 0.3)
         self.frontier_blacklist_radius = rospy.get_param("~frontier_blacklist_radius", 0.5)
+        self.blocked_sector_enabled = rospy.get_param("~blocked_sector_enabled", True)
+        self.blocked_sector_width = rospy.get_param("~blocked_sector_width", 0.9)
+        self.blocked_sector_depth = rospy.get_param("~blocked_sector_depth", 3.0)
+        self.blocked_sector_backtrack = rospy.get_param("~blocked_sector_backtrack", 0.3)
         self.blacklist_ttl = rospy.Duration(rospy.get_param("~blacklist_ttl_sec", 60.0))
         self.blacklist_max_size = rospy.get_param("~blacklist_max_size", 30)
         # frontier 주변 여유 공간을 조금 확인해서 지나치게 벽에 붙은 goal은 피한다.
@@ -74,7 +79,7 @@ class FrontierExploreNode:
         self.viewpoint_min_distance_cells = rospy.get_param("~viewpoint_min_distance_cells", 4)
         self.viewpoint_max_distance_cells = rospy.get_param("~viewpoint_max_distance_cells", 9)
         self.max_goal_failures_before_blacklist = rospy.get_param(
-            "~max_goal_failures_before_blacklist", 2
+            "~max_goal_failures_before_blacklist", 1
         )
         self.suppress_reached_frontier = rospy.get_param("~suppress_reached_frontier", True)
         self.completion_spin_enabled = rospy.get_param("~completion_spin_enabled", True)
@@ -167,10 +172,21 @@ class FrontierExploreNode:
         for bx, by, _stamp in self.frontier_blacklist:
             if math.hypot(wx - bx, wy - by) <= self.frontier_blacklist_radius:
                 return True
+
+        for sector in self.blocked_frontier_sectors:
+            sx, sy, dx, dy, start_dist, end_dist, half_width, _stamp = sector
+            rel_x = wx - sx
+            rel_y = wy - sy
+            forward = (rel_x * dx) + (rel_y * dy)
+            if forward < start_dist or forward > end_dist:
+                continue
+            sideways = abs((rel_x * -dy) + (rel_y * dx))
+            if sideways <= half_width:
+                return True
         return False
 
     def _prune_blacklist(self):
-        if not self.blacklist and not self.frontier_blacklist:
+        if not self.blacklist and not self.frontier_blacklist and not self.blocked_frontier_sectors:
             return
 
         now = rospy.Time.now()
@@ -183,11 +199,20 @@ class FrontierExploreNode:
                 entry for entry in self.frontier_blacklist
                 if now - entry[2] <= self.blacklist_ttl
             ]
+            self.blocked_frontier_sectors = [
+                entry for entry in self.blocked_frontier_sectors
+                if now - entry[7] <= self.blacklist_ttl
+            ]
 
         if self.blacklist_max_size > 0 and len(self.blacklist) > self.blacklist_max_size:
             self.blacklist = self.blacklist[-self.blacklist_max_size:]
         if self.blacklist_max_size > 0 and len(self.frontier_blacklist) > self.blacklist_max_size:
             self.frontier_blacklist = self.frontier_blacklist[-self.blacklist_max_size:]
+        if (
+            self.blacklist_max_size > 0
+            and len(self.blocked_frontier_sectors) > self.blacklist_max_size
+        ):
+            self.blocked_frontier_sectors = self.blocked_frontier_sectors[-self.blacklist_max_size:]
 
     def _add_to_blacklist(self, goal):
         if goal is None:
@@ -215,6 +240,42 @@ class FrontierExploreNode:
             len(self.frontier_blacklist),
             self.frontier_blacklist_radius,
             self.blacklist_ttl.to_sec(),
+        )
+
+    def _add_blocked_sector(self, frontier, reason):
+        if not self.blocked_sector_enabled or frontier is None:
+            return
+
+        dx = frontier[0] - self.current_robot_x
+        dy = frontier[1] - self.current_robot_y
+        distance = math.hypot(dx, dy)
+        if distance <= 0.05:
+            return
+
+        dx /= distance
+        dy /= distance
+        start_dist = max(0.0, distance - self.blocked_sector_backtrack)
+        end_dist = distance + self.blocked_sector_depth
+        half_width = max(0.05, self.blocked_sector_width * 0.5)
+        self.blocked_frontier_sectors.append(
+            (
+                self.current_robot_x,
+                self.current_robot_y,
+                dx,
+                dy,
+                start_dist,
+                end_dist,
+                half_width,
+                rospy.Time.now(),
+            )
+        )
+        self._prune_blacklist()
+        rospy.loginfo(
+            "Blocked frontier sector after %s: sectors=%d width=%.2fm depth=%.2fm",
+            reason,
+            len(self.blocked_frontier_sectors),
+            self.blocked_sector_width,
+            self.blocked_sector_depth,
         )
 
     def _failure_key(self):
@@ -688,6 +749,7 @@ class FrontierExploreNode:
             if failures >= self.max_goal_failures_before_blacklist:
                 rospy.logwarn("Frontier area failed %d times, blacklisting it.", failures)
                 self._add_to_frontier_blacklist(self.current_frontier, "failed navigation")
+                self._add_blocked_sector(self.current_frontier, "failed navigation")
                 self._add_to_blacklist(self.current_goal)
                 self._maybe_force_completion_after_repeated_failures()
             else:
@@ -708,6 +770,7 @@ class FrontierExploreNode:
             if failures >= self.max_goal_failures_before_blacklist:
                 rospy.logwarn("Frontier area timed out %d times, blacklisting it.", failures)
                 self._add_to_frontier_blacklist(self.current_frontier, "navigation timeout")
+                self._add_blocked_sector(self.current_frontier, "navigation timeout")
                 self._add_to_blacklist(self.current_goal)
                 self._maybe_force_completion_after_repeated_failures()
             self.current_goal = None

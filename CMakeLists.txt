@@ -18,6 +18,7 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   sensor_msgs
   std_msgs
+  std_srvs
   tf
   visualization_msgs
 )

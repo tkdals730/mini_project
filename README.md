@@ -227,6 +227,10 @@ roslaunch night_patrol_robot patrol_one_button.launch schedule_enabled:=true res
 - `frontier_prefer_nearest`: 가까운 frontier 우선 선택 여부
 - `frontier_viewpoint_min_distance_cells`: frontier에서 viewpoint까지 최소 셀 거리
 - `frontier_viewpoint_max_distance_cells`: frontier에서 viewpoint까지 최대 셀 거리
+- `frontier_max_goal_failures_before_blacklist`: 같은 frontier를 blacklist하기 전 허용할 실패 횟수
+- `frontier_blocked_sector_enabled`: 실패 frontier 뒤쪽의 같은 방향 후보를 함께 제외할지 여부
+- `frontier_blocked_sector_width`: 실패 방향 차단 구역의 폭
+- `frontier_blocked_sector_depth`: 실패 frontier 뒤쪽으로 추가 차단할 깊이
 - `frontier_suppress_reached_frontier`: 성공한 frontier 영역도 suppress할지 여부
 - `frontier_force_completion_after_repeated_failures`: 맵 증가가 멈춘 뒤 반복 실패 frontier가 충분히 suppress되면 완료로 빠질지 여부
 - `exploration_complete_wait_sec`: reachable frontier가 없을 때 탐색 완료로 판단하기 전 대기 시간

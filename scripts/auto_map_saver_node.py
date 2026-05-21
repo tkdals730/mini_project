@@ -5,9 +5,11 @@ import os
 import actionlib
 import rospy
 from actionlib_msgs.msg import GoalStatus
+from geometry_msgs.msg import Twist
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 from nav_msgs.msg import OccupancyGrid
 from std_msgs.msg import Bool
+from std_srvs.srv import Empty
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
 
 
@@ -31,10 +33,23 @@ class AutoMapSaverNode:
         self.home_approach_waypoint = rospy.get_param("~home_approach_waypoint", {})
         self.home_waypoint = rospy.get_param("~home_waypoint", {})
         self.home_goal_timeout_sec = rospy.get_param("~home_goal_timeout_sec", 45.0)
+        self.completion_escape_enabled = rospy.get_param("~completion_escape_enabled", True)
+        self.completion_escape_reverse_sec = rospy.get_param("~completion_escape_reverse_sec", 2.5)
+        self.completion_escape_reverse_speed = rospy.get_param("~completion_escape_reverse_speed", 0.08)
+        self.completion_escape_cmd_vel_topic = rospy.get_param(
+            "~completion_escape_cmd_vel_topic", "/cmd_vel_nav"
+        )
+        self.clear_costmaps_before_home = rospy.get_param("~clear_costmaps_before_home", True)
 
         self.move_base = None
+        self.cmd_vel_pub = None
+        self.clear_costmaps = None
         if self.return_home_after_save:
             self.move_base = actionlib.SimpleActionClient("move_base", MoveBaseAction)
+            self.cmd_vel_pub = rospy.Publisher(
+                self.completion_escape_cmd_vel_topic, Twist, queue_size=1
+            )
+            self.clear_costmaps = rospy.ServiceProxy("/move_base/clear_costmaps", Empty)
 
         rospy.Subscriber("/map", OccupancyGrid, self._map_callback, queue_size=1)
         rospy.Subscriber("/exploration_complete", Bool, self._complete_callback, queue_size=1)
@@ -152,6 +167,49 @@ class AutoMapSaverNode:
             return False
         return True
 
+    def _publish_stop(self):
+        if self.cmd_vel_pub is not None:
+            self.cmd_vel_pub.publish(Twist())
+
+    def _clear_move_base_costmaps(self):
+        if not self.clear_costmaps_before_home or self.clear_costmaps is None:
+            return
+
+        try:
+            rospy.wait_for_service("/move_base/clear_costmaps", timeout=2.0)
+            self.clear_costmaps()
+            rospy.loginfo("Cleared move_base costmaps before home return.")
+        except (rospy.ROSException, rospy.ServiceException) as exc:
+            rospy.logwarn("Could not clear move_base costmaps before home return: %s", exc)
+
+    def _perform_completion_escape(self):
+        if (
+            not self.completion_escape_enabled
+            or self.cmd_vel_pub is None
+            or self.completion_escape_reverse_sec <= 0.0
+            or self.completion_escape_reverse_speed <= 0.0
+        ):
+            return
+
+        if self.move_base is not None:
+            self.move_base.cancel_all_goals()
+
+        rospy.loginfo(
+            "Backing away from exploration endpoint before home return: %.1fs at %.2fm/s",
+            self.completion_escape_reverse_sec,
+            self.completion_escape_reverse_speed,
+        )
+        reverse = Twist()
+        reverse.linear.x = -abs(self.completion_escape_reverse_speed)
+        end_time = rospy.Time.now() + rospy.Duration(self.completion_escape_reverse_sec)
+        rate = rospy.Rate(10.0)
+        while not rospy.is_shutdown() and rospy.Time.now() < end_time:
+            self.cmd_vel_pub.publish(reverse)
+            rate.sleep()
+
+        self._publish_stop()
+        rospy.sleep(0.2)
+
     def _return_home_after_save(self):
         if self.returned_home or not self.return_home_after_save:
             return
@@ -163,6 +221,9 @@ class AutoMapSaverNode:
         if self.move_base is not None and not self.move_base.wait_for_server(rospy.Duration(10.0)):
             rospy.logwarn("move_base action server is not available. Skipping return home.")
             return
+
+        self._perform_completion_escape()
+        self._clear_move_base_costmaps()
 
         if self._has_waypoint(self.home_approach_waypoint):
             if not self._send_home_goal(self.home_approach_waypoint, "home entry waypoint"):
