@@ -46,16 +46,16 @@
   <!-- rviz 설정 -->
   <arg name="rviz_config" default="$(find night_patrol_robot)/rviz/patrol.rviz" />
   <!-- 맵 설정 -->
-  <arg name="world_name" default="$(find night_patrol_robot)/worlds/office_patrol_nov4.world" />
+  <arg name="world_name" default="$(find night_patrol_robot)/worlds/office_patrol_no_homebay.world" />
   <arg name="frontier_goal_timeout_sec" default="25.0" />
   <arg name="frontier_min_goal_distance" default="0.4" />
   <arg name="frontier_max_goal_distance" default="0.0" />
   <arg name="frontier_blacklist_radius" default="0.2" />
-  <arg name="frontier_area_blacklist_radius" default="0.6" />
+  <arg name="frontier_area_blacklist_radius" default="0.65" />
   <arg name="frontier_blacklist_ttl_sec" default="90.0" />
   <arg name="frontier_blacklist_max_size" default="30" />
-  <arg name="frontier_clearance_cells" default="2" />
-  <arg name="frontier_viewpoint_clearance_cells" default="3" />
+  <arg name="frontier_clearance_cells" default="3" />
+  <arg name="frontier_viewpoint_clearance_cells" default="4" />
   <arg name="frontier_viewpoint_require_known_space" default="false" />
   <arg name="frontier_occupied_threshold" default="40" />
   <arg name="frontier_information_radius_cells" default="4" />
