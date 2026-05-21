@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from array import array
 from collections import deque
 import math
 import os
@@ -125,6 +126,43 @@ def _is_safe_cell(gx, gy, width, height, free_cells, clearance_cells):
             if not free_cells[_to_index(nx, ny, width)]:
                 return False
     return True
+
+
+def _build_safe_cells(width, height, free_cells, clearance_cells):
+    integral_width = width + 1
+    blocked_integral = array("I", [0]) * (integral_width * (height + 1))
+
+    for gy in range(height):
+        row_total = 0
+        source_row = gy * width
+        integral_row = (gy + 1) * integral_width
+        previous_integral_row = gy * integral_width
+        for gx in range(width):
+            if not free_cells[source_row + gx]:
+                row_total += 1
+            blocked_integral[integral_row + gx + 1] = (
+                blocked_integral[previous_integral_row + gx + 1] + row_total
+            )
+
+    safe_cells = [False] * (width * height)
+    for gy in range(clearance_cells, height - clearance_cells):
+        y0 = gy - clearance_cells
+        y1 = gy + clearance_cells + 1
+        top_row = y0 * integral_width
+        bottom_row = y1 * integral_width
+        output_row = gy * width
+        for gx in range(clearance_cells, width - clearance_cells):
+            x0 = gx - clearance_cells
+            x1 = gx + clearance_cells + 1
+            blocked_count = (
+                blocked_integral[bottom_row + x1]
+                - blocked_integral[top_row + x1]
+                - blocked_integral[bottom_row + x0]
+                + blocked_integral[top_row + x0]
+            )
+            safe_cells[output_row + gx] = blocked_count == 0
+
+    return safe_cells
 
 
 def _find_nearest_safe_seed(start_gx, start_gy, width, height, safe_cells):
@@ -298,11 +336,7 @@ def generate_waypoints():
         for gx in range(width):
             free_cells.append(pixels[_to_index(gx, image_y, width)] >= free_pixel_threshold)
     clearance_cells = max(1, int(math.ceil(obstacle_clearance / resolution)))
-    safe_cells = [
-        _is_safe_cell(gx, gy, width, height, free_cells, clearance_cells)
-        for gy in range(height)
-        for gx in range(width)
-    ]
+    safe_cells = _build_safe_cells(width, height, free_cells, clearance_cells)
 
     start_gx, start_gy = _world_to_grid(start_x, start_y, origin_x, origin_y, resolution)
     seed = _find_nearest_safe_seed(start_gx, start_gy, width, height, safe_cells)

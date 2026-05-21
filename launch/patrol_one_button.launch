@@ -22,17 +22,17 @@
   <arg name="map_file" default="$(find night_patrol_robot)/maps/patrol_map.yaml" />
   <arg name="generated_waypoints_file" default="$(find night_patrol_robot)/maps/generated_patrol_waypoints.yaml" />
   <arg name="auto_generate_waypoints" default="true" />
-  <arg name="generated_waypoint_count" default="6" />
-  <arg name="generated_waypoint_spacing" default="1.8" />
-  <arg name="generated_waypoint_min_spacing" default="1.6" />
-  <arg name="generated_waypoint_clearance" default="0.35" />
+  <arg name="generated_waypoint_count" default="10" />
+  <arg name="generated_waypoint_spacing" default="1.2" />
+  <arg name="generated_waypoint_min_spacing" default="1.0" />
+  <arg name="generated_waypoint_clearance" default="0.25" />
   <arg name="patrol_loop" default="false" />
   <arg name="return_home" default="true" />
   <arg name="patrol_wait_sec" default="5.0" />
   <arg name="patrol_goal_timeout_sec" default="75.0" />
   <arg name="use_gazebo" default="true" />
   <arg name="use_rviz" default="true" />
-  <arg name="use_camera_viewer" default="true" />
+  <arg name="use_camera_viewer" default="false" />
   <arg name="use_fire_detection" default="true" />
   <arg name="use_fire_response" default="true" />
   <arg name="camera_view_topic" default="/fire_detection/debug_image" />

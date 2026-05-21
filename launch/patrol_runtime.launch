@@ -8,10 +8,10 @@
   <arg name="map_file" default="$(find night_patrol_robot)/maps/patrol_map.yaml" />
   <arg name="generated_waypoints_file" default="$(find night_patrol_robot)/maps/generated_patrol_waypoints.yaml" />
   <arg name="auto_generate_waypoints" default="true" />
-  <arg name="generated_waypoint_count" default="6" />
-  <arg name="generated_waypoint_spacing" default="1.8" />
-  <arg name="generated_waypoint_min_spacing" default="1.6" />
-  <arg name="generated_waypoint_clearance" default="0.35" />
+  <arg name="generated_waypoint_count" default="10" />
+  <arg name="generated_waypoint_spacing" default="1.2" />
+  <arg name="generated_waypoint_min_spacing" default="1.0" />
+  <arg name="generated_waypoint_clearance" default="0.25" />
   <arg name="patrol_loop" default="false" />
   <arg name="return_home" default="true" />
   <arg name="patrol_wait_sec" default="5.0" />
@@ -270,7 +270,7 @@
       <param name="wait_after_goal_sec" value="$(arg patrol_wait_sec)" />
       <param name="goal_timeout_sec" value="$(arg patrol_goal_timeout_sec)" />
       <param name="waypoints_file" value="$(arg generated_waypoints_file)" />
-      <param name="waypoints_file_wait_sec" value="120.0" />
+      <param name="waypoints_file_wait_sec" value="300.0" />
       <param name="waypoints_file_require_fresh" value="$(arg auto_generate_waypoints)" />
       <rosparam param="home_approach_waypoint">
         x: 0.00
