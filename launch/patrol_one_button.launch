@@ -31,10 +31,11 @@
   <arg name="patrol_wait_sec" default="5.0" />
   <arg name="patrol_goal_timeout_sec" default="75.0" />
   <arg name="use_gazebo" default="true" />
+  <arg name="use_gazebo_gui" default="false" />
   <arg name="use_rviz" default="true" />
   <arg name="use_camera_viewer" default="false" />
-  <arg name="use_fire_detection" default="true" />
-  <arg name="use_fire_response" default="true" />
+  <arg name="use_fire_detection" default="false" />
+  <arg name="use_fire_response" default="false" />
   <arg name="camera_view_topic" default="/fire_detection/debug_image" />
   <arg name="fire_stop_window_sec" default="1.5" />
   <arg name="fire_stop_required_sec" default="0.25" />
@@ -47,12 +48,12 @@
   <arg name="rviz_config" default="$(find night_patrol_robot)/rviz/patrol.rviz" />
   <!-- 맵 설정 -->
   <arg name="world_name" default="$(find night_patrol_robot)/worlds/office_patrol_no_homebay.world" />
-  <arg name="frontier_goal_timeout_sec" default="25.0" />
+  <arg name="frontier_goal_timeout_sec" default="30.0" />
   <arg name="frontier_min_goal_distance" default="0.4" />
   <arg name="frontier_max_goal_distance" default="0.0" />
   <arg name="frontier_blacklist_radius" default="0.2" />
-  <arg name="frontier_area_blacklist_radius" default="0.65" />
-  <arg name="frontier_blacklist_ttl_sec" default="90.0" />
+  <arg name="frontier_area_blacklist_radius" default="0.8" />
+  <arg name="frontier_blacklist_ttl_sec" default="180.0" />
   <arg name="frontier_blacklist_max_size" default="30" />
   <arg name="frontier_clearance_cells" default="3" />
   <arg name="frontier_viewpoint_clearance_cells" default="4" />
@@ -62,26 +63,27 @@
   <arg name="frontier_obstacle_penalty_radius_cells" default="3" />
   <arg name="frontier_information_gain_weight" default="3.0" />
   <arg name="frontier_distance_weight" default="1.0" />
-  <arg name="frontier_obstacle_penalty_weight" default="1.0" />
-  <arg name="frontier_min_cluster_size" default="5" />
+  <arg name="frontier_obstacle_penalty_weight" default="2.0" />
+  <arg name="frontier_min_cluster_size" default="8" />
   <arg name="frontier_size_weight" default="0.5" />
   <arg name="frontier_max_score_distance" default="4.0" />
-  <arg name="frontier_prefer_nearest" default="false" />
-  <arg name="frontier_nearest_score_tolerance" default="1.5" />
+  <arg name="frontier_prefer_nearest" default="true" />
+  <arg name="frontier_nearest_score_tolerance" default="1.0" />
   <arg name="frontier_local_radius" default="1.2" />
-  <arg name="frontier_local_bonus" default="2.0" />
-  <arg name="exploration_complete_wait_sec" default="45.0" />
-  <arg name="frontier_viewpoint_min_distance_cells" default="3" />
-  <arg name="frontier_viewpoint_max_distance_cells" default="10" />
+  <arg name="frontier_local_bonus" default="1.0" />
+  <arg name="exploration_complete_wait_sec" default="60.0" />
+  <arg name="frontier_viewpoint_min_distance_cells" default="4" />
+  <arg name="frontier_viewpoint_max_distance_cells" default="12" />
   <arg name="frontier_max_goal_failures_before_blacklist" default="1" />
-  <arg name="frontier_suppress_reached_frontier" default="false" />
+  <arg name="frontier_suppress_reached_frontier" default="true" />
   <arg name="frontier_completion_spin_attempts" default="2" />
   <arg name="frontier_completion_spin_angular_speed" default="0.45" />
-  <arg name="frontier_minimum_mapping_time_sec" default="120.0" />
-  <arg name="frontier_progress_timeout_sec" default="60.0" />
+  <arg name="frontier_minimum_mapping_time_sec" default="240.0" />
+  <arg name="frontier_max_exploration_time_sec" default="900.0" />
+  <arg name="frontier_progress_timeout_sec" default="120.0" />
   <arg name="frontier_free_cell_growth_threshold" default="25" />
-  <arg name="frontier_min_suppressed_for_completion" default="3" />
-  <arg name="frontier_force_completion_after_repeated_failures" default="true" />
+  <arg name="frontier_min_suppressed_for_completion" default="6" />
+  <arg name="frontier_force_completion_after_repeated_failures" default="false" />
   <arg name="frontier_blocked_sector_enabled" default="true" />
   <arg name="frontier_blocked_sector_width" default="0.9" />
   <arg name="frontier_blocked_sector_depth" default="3.0" />
@@ -111,7 +113,7 @@
     <arg name="preload_gazebo" value="$(arg preload_gazebo)" />
     <arg name="reset_gazebo_pose_on_start" value="$(arg reset_gazebo_pose_on_start)" />
     <arg name="gazebo_model_name" value="$(arg gazebo_model_name)" />
-    <arg name="patrol_launch_args" value="mapping:=$(arg mapping) map_output:=$(arg map_output) map_file:=$(arg map_file) generated_waypoints_file:=$(arg generated_waypoints_file) auto_generate_waypoints:=$(arg auto_generate_waypoints) generated_waypoint_count:=$(arg generated_waypoint_count) generated_waypoint_spacing:=$(arg generated_waypoint_spacing) generated_waypoint_min_spacing:=$(arg generated_waypoint_min_spacing) generated_waypoint_clearance:=$(arg generated_waypoint_clearance) patrol_loop:=$(arg patrol_loop) return_home:=$(arg return_home) patrol_wait_sec:=$(arg patrol_wait_sec) patrol_goal_timeout_sec:=$(arg patrol_goal_timeout_sec) use_gazebo:=$(arg use_gazebo) use_rviz:=$(arg use_rviz) use_camera_viewer:=$(arg use_camera_viewer) use_fire_detection:=$(arg use_fire_detection) use_fire_response:=$(arg use_fire_response) camera_view_topic:=$(arg camera_view_topic) fire_stop_window_sec:=$(arg fire_stop_window_sec) fire_stop_required_sec:=$(arg fire_stop_required_sec) fire_alert_window_sec:=$(arg fire_alert_window_sec) fire_alert_required_sec:=$(arg fire_alert_required_sec) fire_clear_window_sec:=$(arg fire_clear_window_sec) fire_clear_max_sec:=$(arg fire_clear_max_sec) mapping_strategy:=$(arg mapping_strategy) rviz_config:=$(arg rviz_config) world_name:=$(arg world_name) frontier_goal_timeout_sec:=$(arg frontier_goal_timeout_sec) frontier_min_goal_distance:=$(arg frontier_min_goal_distance) frontier_max_goal_distance:=$(arg frontier_max_goal_distance) frontier_blacklist_radius:=$(arg frontier_blacklist_radius) frontier_area_blacklist_radius:=$(arg frontier_area_blacklist_radius) frontier_blacklist_ttl_sec:=$(arg frontier_blacklist_ttl_sec) frontier_blacklist_max_size:=$(arg frontier_blacklist_max_size) frontier_clearance_cells:=$(arg frontier_clearance_cells) frontier_viewpoint_clearance_cells:=$(arg frontier_viewpoint_clearance_cells) frontier_viewpoint_require_known_space:=$(arg frontier_viewpoint_require_known_space) frontier_occupied_threshold:=$(arg frontier_occupied_threshold) frontier_information_radius_cells:=$(arg frontier_information_radius_cells) frontier_obstacle_penalty_radius_cells:=$(arg frontier_obstacle_penalty_radius_cells) frontier_information_gain_weight:=$(arg frontier_information_gain_weight) frontier_distance_weight:=$(arg frontier_distance_weight) frontier_obstacle_penalty_weight:=$(arg frontier_obstacle_penalty_weight) frontier_min_cluster_size:=$(arg frontier_min_cluster_size) frontier_size_weight:=$(arg frontier_size_weight) frontier_max_score_distance:=$(arg frontier_max_score_distance) frontier_prefer_nearest:=$(arg frontier_prefer_nearest) frontier_nearest_score_tolerance:=$(arg frontier_nearest_score_tolerance) frontier_local_radius:=$(arg frontier_local_radius) frontier_local_bonus:=$(arg frontier_local_bonus) exploration_complete_wait_sec:=$(arg exploration_complete_wait_sec) frontier_viewpoint_min_distance_cells:=$(arg frontier_viewpoint_min_distance_cells) frontier_viewpoint_max_distance_cells:=$(arg frontier_viewpoint_max_distance_cells) frontier_max_goal_failures_before_blacklist:=$(arg frontier_max_goal_failures_before_blacklist) frontier_suppress_reached_frontier:=$(arg frontier_suppress_reached_frontier) frontier_completion_spin_attempts:=$(arg frontier_completion_spin_attempts) frontier_completion_spin_angular_speed:=$(arg frontier_completion_spin_angular_speed) frontier_minimum_mapping_time_sec:=$(arg frontier_minimum_mapping_time_sec) frontier_progress_timeout_sec:=$(arg frontier_progress_timeout_sec) frontier_free_cell_growth_threshold:=$(arg frontier_free_cell_growth_threshold) frontier_min_suppressed_for_completion:=$(arg frontier_min_suppressed_for_completion) frontier_force_completion_after_repeated_failures:=$(arg frontier_force_completion_after_repeated_failures) frontier_blocked_sector_enabled:=$(arg frontier_blocked_sector_enabled) frontier_blocked_sector_width:=$(arg frontier_blocked_sector_width) frontier_blocked_sector_depth:=$(arg frontier_blocked_sector_depth) frontier_blocked_sector_backtrack:=$(arg frontier_blocked_sector_backtrack) completion_escape_enabled:=$(arg completion_escape_enabled) completion_escape_reverse_sec:=$(arg completion_escape_reverse_sec) completion_escape_reverse_speed:=$(arg completion_escape_reverse_speed) clear_costmaps_before_home:=$(arg clear_costmaps_before_home) spawn_x:=$(arg spawn_x) spawn_y:=$(arg spawn_y) spawn_z:=$(arg spawn_z) spawn_yaw:=$(arg spawn_yaw) initial_pose_x:=$(arg initial_pose_x) initial_pose_y:=$(arg initial_pose_y) initial_pose_yaw:=$(arg initial_pose_yaw)" />
+    <arg name="patrol_launch_args" value="mapping:=$(arg mapping) map_output:=$(arg map_output) map_file:=$(arg map_file) generated_waypoints_file:=$(arg generated_waypoints_file) auto_generate_waypoints:=$(arg auto_generate_waypoints) generated_waypoint_count:=$(arg generated_waypoint_count) generated_waypoint_spacing:=$(arg generated_waypoint_spacing) generated_waypoint_min_spacing:=$(arg generated_waypoint_min_spacing) generated_waypoint_clearance:=$(arg generated_waypoint_clearance) patrol_loop:=$(arg patrol_loop) return_home:=$(arg return_home) patrol_wait_sec:=$(arg patrol_wait_sec) patrol_goal_timeout_sec:=$(arg patrol_goal_timeout_sec) use_gazebo:=$(arg use_gazebo) use_gazebo_gui:=$(arg use_gazebo_gui) use_rviz:=$(arg use_rviz) use_camera_viewer:=$(arg use_camera_viewer) use_fire_detection:=$(arg use_fire_detection) use_fire_response:=$(arg use_fire_response) camera_view_topic:=$(arg camera_view_topic) fire_stop_window_sec:=$(arg fire_stop_window_sec) fire_stop_required_sec:=$(arg fire_stop_required_sec) fire_alert_window_sec:=$(arg fire_alert_window_sec) fire_alert_required_sec:=$(arg fire_alert_required_sec) fire_clear_window_sec:=$(arg fire_clear_window_sec) fire_clear_max_sec:=$(arg fire_clear_max_sec) mapping_strategy:=$(arg mapping_strategy) rviz_config:=$(arg rviz_config) world_name:=$(arg world_name) frontier_goal_timeout_sec:=$(arg frontier_goal_timeout_sec) frontier_min_goal_distance:=$(arg frontier_min_goal_distance) frontier_max_goal_distance:=$(arg frontier_max_goal_distance) frontier_blacklist_radius:=$(arg frontier_blacklist_radius) frontier_area_blacklist_radius:=$(arg frontier_area_blacklist_radius) frontier_blacklist_ttl_sec:=$(arg frontier_blacklist_ttl_sec) frontier_blacklist_max_size:=$(arg frontier_blacklist_max_size) frontier_clearance_cells:=$(arg frontier_clearance_cells) frontier_viewpoint_clearance_cells:=$(arg frontier_viewpoint_clearance_cells) frontier_viewpoint_require_known_space:=$(arg frontier_viewpoint_require_known_space) frontier_occupied_threshold:=$(arg frontier_occupied_threshold) frontier_information_radius_cells:=$(arg frontier_information_radius_cells) frontier_obstacle_penalty_radius_cells:=$(arg frontier_obstacle_penalty_radius_cells) frontier_information_gain_weight:=$(arg frontier_information_gain_weight) frontier_distance_weight:=$(arg frontier_distance_weight) frontier_obstacle_penalty_weight:=$(arg frontier_obstacle_penalty_weight) frontier_min_cluster_size:=$(arg frontier_min_cluster_size) frontier_size_weight:=$(arg frontier_size_weight) frontier_max_score_distance:=$(arg frontier_max_score_distance) frontier_prefer_nearest:=$(arg frontier_prefer_nearest) frontier_nearest_score_tolerance:=$(arg frontier_nearest_score_tolerance) frontier_local_radius:=$(arg frontier_local_radius) frontier_local_bonus:=$(arg frontier_local_bonus) exploration_complete_wait_sec:=$(arg exploration_complete_wait_sec) frontier_viewpoint_min_distance_cells:=$(arg frontier_viewpoint_min_distance_cells) frontier_viewpoint_max_distance_cells:=$(arg frontier_viewpoint_max_distance_cells) frontier_max_goal_failures_before_blacklist:=$(arg frontier_max_goal_failures_before_blacklist) frontier_suppress_reached_frontier:=$(arg frontier_suppress_reached_frontier) frontier_completion_spin_attempts:=$(arg frontier_completion_spin_attempts) frontier_completion_spin_angular_speed:=$(arg frontier_completion_spin_angular_speed) frontier_minimum_mapping_time_sec:=$(arg frontier_minimum_mapping_time_sec) frontier_max_exploration_time_sec:=$(arg frontier_max_exploration_time_sec) frontier_progress_timeout_sec:=$(arg frontier_progress_timeout_sec) frontier_free_cell_growth_threshold:=$(arg frontier_free_cell_growth_threshold) frontier_min_suppressed_for_completion:=$(arg frontier_min_suppressed_for_completion) frontier_force_completion_after_repeated_failures:=$(arg frontier_force_completion_after_repeated_failures) frontier_blocked_sector_enabled:=$(arg frontier_blocked_sector_enabled) frontier_blocked_sector_width:=$(arg frontier_blocked_sector_width) frontier_blocked_sector_depth:=$(arg frontier_blocked_sector_depth) frontier_blocked_sector_backtrack:=$(arg frontier_blocked_sector_backtrack) completion_escape_enabled:=$(arg completion_escape_enabled) completion_escape_reverse_sec:=$(arg completion_escape_reverse_sec) completion_escape_reverse_speed:=$(arg completion_escape_reverse_speed) clear_costmaps_before_home:=$(arg clear_costmaps_before_home) spawn_x:=$(arg spawn_x) spawn_y:=$(arg spawn_y) spawn_z:=$(arg spawn_z) spawn_yaw:=$(arg spawn_yaw) initial_pose_x:=$(arg initial_pose_x) initial_pose_y:=$(arg initial_pose_y) initial_pose_yaw:=$(arg initial_pose_yaw)" />
   </include>
 
   <node pkg="night_patrol_robot"
@@ -134,6 +136,7 @@
     <param name="patrol_wait_sec" value="$(arg patrol_wait_sec)" />
     <param name="patrol_goal_timeout_sec" value="$(arg patrol_goal_timeout_sec)" />
     <param name="use_gazebo" value="$(arg use_gazebo)" />
+    <param name="use_gazebo_gui" value="$(arg use_gazebo_gui)" />
     <param name="use_rviz" value="$(arg use_rviz)" />
     <param name="use_camera_viewer" value="$(arg use_camera_viewer)" />
     <param name="use_fire_detection" value="$(arg use_fire_detection)" />
@@ -179,6 +182,7 @@
     <param name="frontier_completion_spin_attempts" value="$(arg frontier_completion_spin_attempts)" />
     <param name="frontier_completion_spin_angular_speed" value="$(arg frontier_completion_spin_angular_speed)" />
     <param name="frontier_minimum_mapping_time_sec" value="$(arg frontier_minimum_mapping_time_sec)" />
+    <param name="frontier_max_exploration_time_sec" value="$(arg frontier_max_exploration_time_sec)" />
     <param name="frontier_progress_timeout_sec" value="$(arg frontier_progress_timeout_sec)" />
     <param name="frontier_free_cell_growth_threshold" value="$(arg frontier_free_cell_growth_threshold)" />
     <param name="frontier_min_suppressed_for_completion" value="$(arg frontier_min_suppressed_for_completion)" />

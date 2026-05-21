@@ -91,6 +91,9 @@ class FrontierExploreNode:
         self.minimum_mapping_time = rospy.Duration(
             rospy.get_param("~minimum_mapping_time_sec", 120.0)
         )
+        self.max_exploration_time = rospy.Duration(
+            rospy.get_param("~max_exploration_time_sec", 0.0)
+        )
         self.progress_timeout = rospy.Duration(
             rospy.get_param("~progress_timeout_sec", 60.0)
         )
@@ -660,7 +663,12 @@ class FrontierExploreNode:
         self.last_frontier_seen_time = rospy.Time.now()
         return True
 
-    def _completion_conditions_met(self, require_frontier_wait=True):
+    def _completion_conditions_met(
+        self,
+        require_frontier_wait=True,
+        require_no_progress=True,
+        require_suppressed=True,
+    ):
         now = rospy.Time.now()
         if now - self.start_time < self.minimum_mapping_time:
             rospy.loginfo_throttle(
@@ -676,22 +684,29 @@ class FrontierExploreNode:
         ):
             return False
 
-        no_progress = now - self.last_progress_time >= self.progress_timeout
-        enough_suppressed = (
-            self.suppressed_frontier_events >= self.min_suppressed_frontiers_for_completion
-        )
+        if require_no_progress:
+            no_progress = now - self.last_progress_time >= self.progress_timeout
+            if not no_progress:
+                rospy.loginfo_throttle(
+                    10.0,
+                    "Exploration completion blocked: map progress is still recent.",
+                )
+                return False
 
-        if no_progress and enough_suppressed:
-            return True
+        if require_suppressed:
+            enough_suppressed = (
+                self.suppressed_frontier_events >= self.min_suppressed_frontiers_for_completion
+            )
+            if not enough_suppressed:
+                rospy.loginfo_throttle(
+                    10.0,
+                    "Exploration completion blocked: suppressed=%d/%d.",
+                    self.suppressed_frontier_events,
+                    self.min_suppressed_frontiers_for_completion,
+                )
+                return False
 
-        rospy.loginfo_throttle(
-            10.0,
-            "Exploration completion blocked: no_progress=%s suppressed=%d/%d.",
-            "yes" if no_progress else "no",
-            self.suppressed_frontier_events,
-            self.min_suppressed_frontiers_for_completion,
-        )
-        return False
+        return True
 
     def _publish_exploration_complete(self, reason):
         if self.exploration_complete_published:
@@ -702,6 +717,12 @@ class FrontierExploreNode:
         self.exploration_complete_pub.publish(Bool(data=True))
         self.exploration_complete_published = True
 
+    def _max_exploration_time_reached(self):
+        return (
+            self.max_exploration_time.to_sec() > 0.0
+            and rospy.Time.now() - self.start_time >= self.max_exploration_time
+        )
+
     def _maybe_force_completion_after_repeated_failures(self):
         if (
             not self.force_completion_after_repeated_failures
@@ -709,7 +730,11 @@ class FrontierExploreNode:
         ):
             return
 
-        if self._completion_conditions_met(require_frontier_wait=False):
+        if self._completion_conditions_met(
+            require_frontier_wait=False,
+            require_no_progress=True,
+            require_suppressed=True,
+        ):
             self._publish_exploration_complete(
                 "map progress stopped and repeated frontier failures were suppressed"
             )
@@ -722,8 +747,11 @@ class FrontierExploreNode:
             if self._spin_in_place_for_scan():
                 return
 
-        if not self._completion_conditions_met(require_frontier_wait=True):
-            self.last_frontier_seen_time = rospy.Time.now()
+        if not self._completion_conditions_met(
+            require_frontier_wait=True,
+            require_no_progress=False,
+            require_suppressed=False,
+        ):
             return
 
         self._publish_exploration_complete(
@@ -797,6 +825,14 @@ class FrontierExploreNode:
                     self.current_goal = None
                     self.current_frontier = None
                 self.cmd_vel_pub.publish(Twist())
+                rate.sleep()
+                continue
+
+            if self._max_exploration_time_reached():
+                self._publish_exploration_complete(
+                    "maximum exploration time %.1f sec reached"
+                    % self.max_exploration_time.to_sec()
+                )
                 rate.sleep()
                 continue
 
