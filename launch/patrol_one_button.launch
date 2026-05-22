@@ -23,9 +23,9 @@
   <arg name="generated_waypoints_file" default="$(find night_patrol_robot)/maps/generated_patrol_waypoints.yaml" />
   <arg name="auto_generate_waypoints" default="true" />
   <arg name="generated_waypoint_count" default="10" />
-  <arg name="generated_waypoint_spacing" default="1.2" />
-  <arg name="generated_waypoint_min_spacing" default="1.0" />
-  <arg name="generated_waypoint_clearance" default="0.25" />
+  <arg name="generated_waypoint_spacing" default="0.8" />
+  <arg name="generated_waypoint_min_spacing" default="0.8" />
+  <arg name="generated_waypoint_clearance" default="0.30" />
   <arg name="patrol_loop" default="false" />
   <arg name="return_home" default="true" />
   <arg name="patrol_wait_sec" default="5.0" />

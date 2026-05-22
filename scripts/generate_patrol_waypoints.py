@@ -258,6 +258,23 @@ def _select_spread_points(candidates, start, max_count, min_spacing_cells):
     return selected
 
 
+def _select_spread_points_with_relaxed_spacing(
+    candidates,
+    start,
+    max_count,
+    min_spacing_cells,
+    min_spacing_floor_cells,
+):
+    selected = []
+    spacing = max(min_spacing_cells, min_spacing_floor_cells)
+    while spacing >= min_spacing_floor_cells:
+        selected = _select_spread_points(candidates, start, max_count, spacing)
+        if len(selected) >= max_count:
+            return selected
+        spacing -= 1
+    return selected
+
+
 def _order_nearest_neighbor(points, start):
     ordered = []
     remaining = list(points)
@@ -316,9 +333,10 @@ def generate_waypoints():
         "output_file", os.path.join(package_dir, "maps", "generated_patrol_waypoints.yaml")
     )
     max_waypoints = int(_get_param("max_waypoints", 6))
-    sample_spacing = float(_get_param("sample_spacing", 1.8))
-    min_waypoint_spacing = float(_get_param("min_waypoint_spacing", 1.6))
-    obstacle_clearance = float(_get_param("obstacle_clearance", 0.35))
+    sample_spacing = float(_get_param("sample_spacing", 0.8))
+    min_waypoint_spacing = float(_get_param("min_waypoint_spacing", 0.8))
+    min_waypoint_spacing_floor = float(_get_param("min_waypoint_spacing_floor", 0.6))
+    obstacle_clearance = float(_get_param("obstacle_clearance", 0.30))
     wait_sec = float(_get_param("wait_sec", 3.0))
     start_x = float(_get_param("start_x", 0.0))
     start_y = float(_get_param("start_y", 0.85))
@@ -346,8 +364,15 @@ def generate_waypoints():
     reachable = _reachable_safe_cells(seed, width, height, safe_cells)
     stride_cells = max(1, int(round(sample_spacing / resolution)))
     min_spacing_cells = max(1, int(round(min_waypoint_spacing / resolution)))
+    min_spacing_floor_cells = max(1, int(round(min_waypoint_spacing_floor / resolution)))
     candidates = _sample_candidates(width, height, reachable, stride_cells)
-    selected = _select_spread_points(candidates, seed, max_waypoints, min_spacing_cells)
+    selected = _select_spread_points_with_relaxed_spacing(
+        candidates,
+        seed,
+        max_waypoints,
+        min_spacing_cells,
+        min_spacing_floor_cells,
+    )
     ordered = _order_nearest_neighbor(selected, seed)
     waypoints = _points_to_waypoints(ordered, origin_x, origin_y, resolution, wait_sec)
 
@@ -365,11 +390,12 @@ def generate_waypoints():
 
 def main():
     global ROS_NODE_READY
-    try:
-        rospy.init_node("generate_patrol_waypoints")
-        ROS_NODE_READY = True
-    except Exception as exc:
-        print("Running without ROS master: %s" % exc)
+    if not _cli_private_params():
+        try:
+            rospy.init_node("generate_patrol_waypoints")
+            ROS_NODE_READY = True
+        except Exception as exc:
+            print("Running without ROS master: %s" % exc)
     generate_waypoints()
 
 
