@@ -192,9 +192,17 @@ class ScheduledPatrolNode:
         launch_file = roslaunch.rlutil.resolve_launch_arguments(
             ["night_patrol_robot", "gazebo_robot.launch"]
         )[0]
-        gazebo_arg_names = ["world_name", "spawn_x", "spawn_y", "spawn_z", "spawn_yaw"]
+        gazebo_arg_names = [
+            "world_name",
+            "spawn_x",
+            "spawn_y",
+            "spawn_z",
+            "spawn_yaw",
+            "use_gazebo_gui",
+        ]
         cli_args = [
-            "%s:=%s" % (name, self.patrol_arg_values[name])
+            "%s:=%s"
+            % ("gui" if name == "use_gazebo_gui" else name, self.patrol_arg_values[name])
             for name in gazebo_arg_names
             if name in self.patrol_arg_values
         ]
