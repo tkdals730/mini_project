@@ -84,6 +84,7 @@ class PatrolLaunchSupervisor:
             "frontier_viewpoint_require_known_space",
             "frontier_occupied_threshold",
             "frontier_information_radius_cells",
+            "frontier_min_information_gain",
             "frontier_obstacle_penalty_radius_cells",
             "frontier_information_gain_weight",
             "frontier_distance_weight",

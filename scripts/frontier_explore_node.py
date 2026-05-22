@@ -65,6 +65,9 @@ class FrontierExploreNode:
         # 넓고 정보량이 큰 frontier를 선호하되, 먼 goal과 장애물 근접 후보는 감점한다.
         self.frontier_size_weight = rospy.get_param("~frontier_size_weight", 1.0)
         self.information_radius_cells = rospy.get_param("~information_radius_cells", 4)
+        self.min_frontier_information_gain = rospy.get_param(
+            "~min_frontier_information_gain", 6
+        )
         self.obstacle_penalty_radius_cells = rospy.get_param("~obstacle_penalty_radius_cells", 3)
         self.information_gain_weight = rospy.get_param("~information_gain_weight", 1.0)
         self.distance_weight = rospy.get_param("~distance_weight", 0.25)
@@ -411,7 +414,10 @@ class FrontierExploreNode:
         frontier_cells = set()
         for gy in range(1, height - 1):
             for gx in range(1, width - 1):
-                if self._is_frontier_cell(gx, gy, width, data):
+                if (
+                    self._is_frontier_cell(gx, gy, width, data)
+                    and self._has_free_clearance(gx, gy, width, height, data)
+                ):
                     frontier_cells.add((gx, gy))
 
         clusters = []
@@ -563,6 +569,9 @@ class FrontierExploreNode:
                 len(cluster),
                 resolution,
             )
+            if information_gain < self.min_frontier_information_gain:
+                continue
+
             should_select = best_score is None or score > best_score
             if self.prefer_nearest_frontier and best_goal is not None:
                 best_distance = best_goal[3]

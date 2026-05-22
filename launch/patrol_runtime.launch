@@ -41,9 +41,10 @@
   <arg name="frontier_blacklist_max_size" default="30" />
   <arg name="frontier_clearance_cells" default="3" />
   <arg name="frontier_viewpoint_clearance_cells" default="4" />
-  <arg name="frontier_viewpoint_require_known_space" default="false" />
+  <arg name="frontier_viewpoint_require_known_space" default="true" />
   <arg name="frontier_occupied_threshold" default="40" />
   <arg name="frontier_information_radius_cells" default="4" />
+  <arg name="frontier_min_information_gain" default="6" />
   <arg name="frontier_obstacle_penalty_radius_cells" default="3" />
   <arg name="frontier_information_gain_weight" default="3.0" />
   <arg name="frontier_distance_weight" default="1.0" />
@@ -205,6 +206,7 @@
         <param name="viewpoint_require_known_space" value="$(arg frontier_viewpoint_require_known_space)" />
         <param name="occupied_threshold" value="$(arg frontier_occupied_threshold)" />
         <param name="information_radius_cells" value="$(arg frontier_information_radius_cells)" />
+        <param name="min_frontier_information_gain" value="$(arg frontier_min_information_gain)" />
         <param name="obstacle_penalty_radius_cells" value="$(arg frontier_obstacle_penalty_radius_cells)" />
         <param name="information_gain_weight" value="$(arg frontier_information_gain_weight)" />
         <param name="distance_weight" value="$(arg frontier_distance_weight)" />
