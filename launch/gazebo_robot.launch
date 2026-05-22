@@ -1,6 +1,6 @@
 <launch>
   <arg name="model" default="waffle_pi" />
-  <arg name="world_name" default="$(find night_patrol_robot)/worlds/office_patrol_nov2.world" />
+  <arg name="world_name" default="$(find night_patrol_robot)/worlds/office_patrol_no_homebay.world" />
   <arg name="spawn_x" default="0.0" />
   <arg name="spawn_y" default="0.0" />
   <arg name="spawn_z" default="0.01" />
