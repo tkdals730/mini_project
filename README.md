@@ -24,7 +24,6 @@ night_patrol_robot/
 ├── maps/                    # 저장된 patrol_map 출력 위치
 ├── rviz/                    # RViz 설정
 ├── scripts/                 # 탐색, 순찰, 화재 감지 ROS 노드
-├── urdf/                    # 로봇 관련 xacro 파일
 └── worlds/                  # Gazebo 사무실/테스트 월드
 ```
 
