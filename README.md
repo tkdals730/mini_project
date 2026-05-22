@@ -150,13 +150,13 @@ roslaunch night_patrol_robot patrol_one_button.launch schedule_enabled:=true res
 
 ## 실행 화면 및 결과
 
-| 맵핑 결과 | 자동 waypoint | waypoint 순찰 |
+| 기본 Gazebo 월드 | 맵핑 결과 | 자동 waypoint |
 | --- | --- | --- |
-| ![맵핑 결과](screenshoots/mapping_result.png) | ![자동 waypoint](screenshoots/waypoint.png) | ![waypoint 순찰](screenshoots/go_waypoint.png) |
+| ![기본 Gazebo 월드](screenshoots/world.png) | ![맵핑 결과](screenshoots/mapping_result.png) | ![자동 waypoint](screenshoots/waypoint.png) |
 
-| 순찰 cycle | 화재 경보 |
-| --- | --- |
-| ![순찰 cycle](screenshoots/patrol_cycle.png) | ![화재 경보](screenshoots/fire_alter.png) |
+| waypoint 순찰 | 순찰 cycle | 화재 경보 |
+| --- | --- | --- |
+| ![waypoint 순찰](screenshoots/go_waypoint.png) | ![순찰 cycle](screenshoots/patrol_cycle.png) | ![화재 경보](screenshoots/fire_alter.png) |
 
 시연 영상은 아래 썸네일을 클릭해서 확인합니다.
 
@@ -209,7 +209,6 @@ roslaunch night_patrol_robot patrol_one_button.launch schedule_enabled:=true res
 - 필요 시 `frontier_viewpoint_clearance_cells`, distance/obstacle penalty, home waypoint/tolerance 등 세부 튜닝 재검토
 - ROS launch smoke test 또는 간단한 노드 단위 테스트 추가
 - `package.xml`의 license, maintainer metadata 정리
-- README에 맵 예시 이미지 추가
 
 ## 개발 메모
 
