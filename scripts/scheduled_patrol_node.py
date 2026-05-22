@@ -7,6 +7,8 @@ from gazebo_msgs.msg import ModelState
 from gazebo_msgs.srv import SetModelState
 from geometry_msgs.msg import Quaternion, Twist
 import roslaunch
+import roslaunch.core
+import roslaunch.scriptapi
 import rospy
 from std_msgs.msg import Bool
 from tf.transformations import quaternion_from_euler
@@ -86,6 +88,7 @@ class ScheduledPatrolNode:
             minutes=max(0.0, rospy.get_param("~rest_minutes_after_run", 0.0))
         )
         self.preload_gazebo = rospy.get_param("~preload_gazebo", True)
+        self.preload_rviz = rospy.get_param("~preload_rviz", True)
         self.reset_gazebo_pose_on_start = rospy.get_param(
             "~reset_gazebo_pose_on_start", True
         )
@@ -98,6 +101,8 @@ class ScheduledPatrolNode:
 
         self.parent = None
         self.gazebo_parent = None
+        self.rviz_launch = None
+        self.rviz_process = None
         self.uuid = None
         self.gazebo_uuid = None
         self.run_started_at = None
@@ -114,14 +119,17 @@ class ScheduledPatrolNode:
         rospy.on_shutdown(self.shutdown)
         if self.preload_gazebo:
             self.start_gazebo()
+        if self.preload_rviz:
+            self.start_rviz()
 
         rospy.loginfo(
-            "Scheduled patrol ready: start=%s end=%s max_run=%.1fmin rest_after_run=%.1fmin preload_gazebo=%s check_period=%.1fs",
+            "Scheduled patrol ready: start=%s end=%s max_run=%.1fmin rest_after_run=%.1fmin preload_gazebo=%s preload_rviz=%s check_period=%.1fs",
             self.start_time.strftime("%H:%M"),
             self.end_time.strftime("%H:%M"),
             self.max_run_duration.total_seconds() / 60.0,
             self.rest_after_run.total_seconds() / 60.0,
             self.preload_gazebo,
+            self.preload_rviz,
             self.check_period_sec,
         )
 
@@ -211,6 +219,26 @@ class ScheduledPatrolNode:
         )
         self.gazebo_parent.start()
 
+    def start_rviz(self):
+        if self.rviz_process is not None:
+            return
+        if str(self.patrol_arg_values.get("use_rviz", "true")).lower() in ("false", "0", "no"):
+            return
+
+        rviz_config = self.patrol_arg_values.get("rviz_config", "")
+        rviz_args = "-d %s" % rviz_config if rviz_config else ""
+        rospy.loginfo("Preloading RViz before scheduled patrol.")
+        self.rviz_launch = roslaunch.scriptapi.ROSLaunch()
+        self.rviz_launch.start()
+        rviz_node = roslaunch.core.Node(
+            package="rviz",
+            node_type="rviz",
+            name="rviz",
+            args=rviz_args,
+            output="screen",
+        )
+        self.rviz_process = self.rviz_launch.launch(rviz_node)
+
     def _build_reset_model_state(self):
         x = _as_float(self.patrol_arg_values, "initial_pose_x", 0.0)
         y = _as_float(self.patrol_arg_values, "initial_pose_y", 0.55)
@@ -270,9 +298,13 @@ class ScheduledPatrolNode:
             ["night_patrol_robot", "patrol_one_button.launch"]
         )[0]
         cli_args = list(self.patrol_cli_args)
+        cli_args = _with_launch_arg(cli_args, "schedule_enabled", "false")
         if self.preload_gazebo:
             cli_args = _with_launch_arg(cli_args, "use_gazebo", "false")
             rospy.loginfo("Scheduled patrol will reuse preloaded Gazebo.")
+        if self.rviz_process is not None:
+            cli_args = _with_launch_arg(cli_args, "use_rviz", "false")
+            rospy.loginfo("Scheduled patrol will reuse preloaded RViz.")
 
         self.parent = roslaunch.parent.ROSLaunchParent(self.uuid, [(launch_file, cli_args)])
         self.parent.start()
@@ -312,6 +344,10 @@ class ScheduledPatrolNode:
             self.gazebo_parent.shutdown()
             self.gazebo_parent = None
             self.gazebo_uuid = None
+        if self.rviz_process is not None:
+            self.rviz_process.stop()
+            self.rviz_process = None
+            self.rviz_launch = None
         elif self.publish_pause_on_idle:
             self.pause_pub.publish(Bool(data=True))
 

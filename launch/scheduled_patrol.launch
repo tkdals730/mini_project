@@ -12,6 +12,7 @@
   <arg name="max_run_minutes" default="0.0" />
   <arg name="rest_minutes_after_run" default="0.0" />
   <arg name="preload_gazebo" default="true" />
+  <arg name="preload_rviz" default="true" />
   <arg name="reset_gazebo_pose_on_start" default="true" />
   <arg name="gazebo_model_name" default="turtlebot3_waffle_pi" />
   <arg name="patrol_launch_args" default="" />
@@ -30,6 +31,7 @@
     <param name="max_run_minutes" value="$(arg max_run_minutes)" />
     <param name="rest_minutes_after_run" value="$(arg rest_minutes_after_run)" />
     <param name="preload_gazebo" value="$(arg preload_gazebo)" />
+    <param name="preload_rviz" value="$(arg preload_rviz)" />
     <param name="reset_gazebo_pose_on_start" value="$(arg reset_gazebo_pose_on_start)" />
     <param name="gazebo_model_name" value="$(arg gazebo_model_name)" />
     <param name="patrol_launch_args" value="$(arg patrol_launch_args)" />
