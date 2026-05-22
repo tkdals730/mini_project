@@ -2,7 +2,7 @@
 
 이 문서는 야간 순찰 로봇 프로젝트의 실제 운영 흐름과 검증 절차를 정리한다.
 프로젝트의 기본 목표는 처음 실행 시 지도를 만들고, 이후 저장된 지도를 기준으로 정해진 시간에 순찰을 수행한 뒤 원래 자리로 돌아오는 것이다.
-화재 감지 시 경보 방식은 아직 설계 중이며, 현재는 감지 결과를 확인하는 단계로 둔다.
+화재 감지 시에는 감지 노드와 대응 노드가 함께 동작한다. 기본 실행에서는 화재 후보가 보이면 일시 정지하고, 일정 시간 이상 유지되면 `/patrol_alert`와 디버그 이미지 경고 배너로 알린다.
 
 ## 진행 현황
 
@@ -13,8 +13,8 @@
 | 3 | 저장 맵 기반 순찰 | 완료 | 추가 실패 케이스 발견 시 복구 정책 보강 |
 | 4 | 특정 시간 순찰 | 구현 완료, 검증 진행 | 시간 압축 테스트와 시연 증거 정리 |
 | 5 | 원래 자리 복귀 | 완료 | 필요 시 home 좌표/tolerance 미세 조정 |
-| 6 | 화재 감지 | 완료 | 추후 웹/앱 연동과 감지 위치 기록 설계 |
-| 7 | 원버튼 자동 실행 | 부분 구현 | `mapping:=auto` 전체 흐름을 처음부터 끝까지 검증 |
+| 6 | 화재 감지/대응 | 완료 | 추후 웹/앱 연동과 감지 위치 기록 설계 |
+| 7 | 원버튼 자동 실행 | 구현 완료, 검증 진행 | `mapping:=auto` 전체 흐름을 처음부터 끝까지 검증 |
 
 ### 체크리스트 진행률
 
@@ -49,7 +49,7 @@
   - [x] 순찰 완료 후 home 복귀 구현
   - [x] 맵 저장 후 home 복귀 구현
   - [x] home 복귀 최종 waypoint 성공 확인
-- [x] 6. 화재 감지 완료
+- [x] 6. 화재 감지/대응 완료
   - [x] 카메라 토픽 확인
   - [x] `/fire_detected` publish 확인
   - [x] debug image 확인
@@ -71,7 +71,7 @@
 
 ## 빠른 시연 흐름
 
-저장된 기준 맵이 있는 현재 상태에서는 다음 순서로 시연하는 것이 가장 안정적이다.
+저장된 기준 맵이 있는 현재 상태에서는 다음 순서로 시연하는 것이 가장 안정적이다. 기본 실행은 Gazebo GUI, RViz, 카메라 이미지 뷰어, 화재 감지 노드, 화재 대응 노드를 함께 켠다.
 
 ```bash
 cd ~/catkin_ws
@@ -80,7 +80,21 @@ source devel/setup.bash
 roslaunch night_patrol_robot patrol_one_button.launch mapping:=false
 ```
 
-시연에서 확인할 핵심 화면은 RViz의 `Patrol Waypoints` marker, 로봇의 waypoint 이동, `/fire_detection/debug_image`의 감지 표시다. 화면 부하가 크면 `use_camera_viewer:=false` 또는 `use_rviz:=false`를 붙여 한 화면씩 분리해서 확인한다.
+시연에서 확인할 핵심 화면은 Gazebo 월드, RViz의 `Patrol Waypoints` marker, 로봇의 waypoint 이동, `/fire_detection/debug_image`의 감지/경보 표시다. 화면 부하가 크면 `use_gazebo_gui:=false`, `use_camera_viewer:=false`, `use_rviz:=false`를 붙여 한 화면씩 분리해서 확인한다.
+
+## 관측 결과 자료
+
+README에는 대표 실행 화면과 영상 링크를 짧게 정리한다. 세부 관측은 이 문서 기준으로 관리한다.
+
+| 자료 | 경로 | 확인 내용 |
+| --- | --- | --- |
+| 맵핑 결과 화면 | `screenshoots/mapping_result.png` | SLAM으로 생성된 사무실 맵과 RViz 표시 상태 |
+| 자동 waypoint 화면 | `screenshoots/waypoint.png` | 저장 맵 기반 waypoint marker 생성 |
+| waypoint 순찰 화면 | `screenshoots/go_waypoint.png` | `move_base` goal 처리와 순찰 이동 |
+| 순찰 cycle 화면 | `screenshoots/patrol_cycle.png` | waypoint 순회 및 cycle 진행 상태 |
+| 화재 경보 화면 | `screenshoots/fire_alter.png` | 감지 영역, 정지/경보 표시, debug image 배너 |
+| 맵핑 결과 영상 | `result/mapping_result_10sec.mp4` | 맵핑 결과 요약 확인 |
+| waypoint 순찰 영상 | `result/waypoint_patrol_2min.mp4` | 저장 맵 기반 순찰 동작 확인 |
 
 ## 전체 운영 흐름
 
@@ -99,7 +113,7 @@ roslaunch night_patrol_robot patrol_one_button.launch mapping:=false
 
 ### 목적
 
-처음 환경을 실행했을 때 로봇이 Gazebo 사무실 월드에서 스스로 움직이며 SLAM 지도를 만든다.
+처음 환경을 실행했을 때 로봇이 기본 Gazebo 사무실 월드인 `office_patrol_no_homebay.world`에서 스스로 움직이며 SLAM 지도를 만든다.
 
 ### 실행
 
@@ -196,7 +210,7 @@ roslaunch night_patrol_robot patrol_one_button.launch mapping:=false
 
 `scheduled_patrol_node.py`와 `launch/scheduled_patrol.launch`가 구현되어 있다. 기본 진입점은 그대로 `patrol_one_button.launch`를 사용하며, `schedule_enabled:=true`를 주면 scheduler가 시간대를 판단해 순찰 launch를 시작한다.
 
-스케줄러는 Gazebo를 미리 띄울 수 있고(`preload_gazebo:=true`), 순찰 시간이 되면 실제 순찰 launch를 `use_gazebo:=false`로 시작해 Gazebo 중복 실행을 피한다.
+스케줄러는 Gazebo를 미리 띄울 수 있고(`preload_gazebo:=true`), 순찰 시간이 되면 실제 순찰 launch를 `use_gazebo:=false`로 시작해 Gazebo 중복 실행을 피한다. 이때 Gazebo GUI 여부는 `use_gazebo_gui` 값을 그대로 전달한다.
 
 ### 결정된 운영 정책
 
@@ -318,20 +332,20 @@ graceful_stop_timeout_sec: 600
 
 ### 남은 위험
 
-`office_patrol_nov4.world` 상단 끝 구역에서 reachable frontier가 남아 있는 것으로 판단되면 `/exploration_complete`가 늦어질 수 있다. 반복 실패 frontier suppress와 강제 완료 전환을 재실행으로 검증한다.
+`office_patrol_no_homebay.world`에서 reachable frontier가 남아 있는 것으로 판단되면 `/exploration_complete`가 늦어질 수 있다. 반복 실패 frontier suppress와 강제 완료 전환을 재실행으로 검증한다.
 
-## Workflow 6. 화재 감지
+## Workflow 6. 화재 감지/대응
 
 ### 목적
 
-순찰 중 카메라 이미지에서 화재 후보를 감지한다.
+순찰 중 카메라 이미지에서 화재 후보를 감지하고, 일정 조건을 만족하면 순찰을 일시 정지한 뒤 경보를 낸다.
 
 ### 실행
 
-화재 감지 노드는 기본적으로 `patrol_one_button.launch`에서 함께 실행된다.
+화재 감지 노드와 화재 대응 노드는 기본적으로 `patrol_one_button.launch`에서 함께 실행된다. 카메라 뷰어는 기본적으로 `/fire_detection/debug_image`를 표시한다.
 
 ```bash
-roslaunch night_patrol_robot patrol_one_button.launch mapping:=false use_fire_detection:=true
+roslaunch night_patrol_robot patrol_one_button.launch mapping:=false
 ```
 
 화재 감지 테스트 월드를 직접 지정할 수도 있다.
@@ -345,12 +359,19 @@ roslaunch night_patrol_robot patrol_one_button.launch mapping:=false world_name:
 - `/camera/rgb/image_raw`가 publish되는지 확인
 - `/fire_detected`가 publish되는지 확인
 - `/fire_detection/debug_image`에서 감지 영역이 표시되는지 확인
+- `fire_response_node`가 실행되는지 확인
 - `/patrol_pause`가 true가 되면서 순찰 goal이 취소되고 로봇이 정지하는지 확인
 - 정지 후에도 화재 후보가 유지되면 `/patrol_alert`에 `화재 발생!!!` 메시지가 publish되는지 확인
 - 경보 상태에서 debug image 상단에 `FIRE ALERT!!!` 배너가 표시되는지 확인
 - 화재 후보가 사라지면 `/patrol_pause`가 false가 되고 같은 waypoint 순찰을 재개하는지 확인
 - 화재가 없을 때 false 상태가 유지되는지 확인
 - 화재 후보가 보이면 true 상태로 바뀌는지 확인
+
+화재 대응 없이 원본 카메라만 확인하려면 다음처럼 실행한다.
+
+```bash
+roslaunch night_patrol_robot patrol_one_button.launch mapping:=false use_fire_detection:=false use_fire_response:=false camera_view_topic:=/camera/rgb/image_raw
+```
 
 ### 현재 정책
 
@@ -364,7 +385,7 @@ roslaunch night_patrol_robot patrol_one_button.launch mapping:=false world_name:
 
 ### 목적
 
-사용자가 복잡한 명령을 기억하지 않아도 `patrol_one_button.launch` 하나로 현재 상태에 맞는 모드를 실행한다.
+사용자가 복잡한 명령을 기억하지 않아도 `patrol_one_button.launch` 하나로 현재 상태에 맞는 모드를 실행한다. 기본 월드는 `worlds/office_patrol_no_homebay.world`이고, 기본 화면/화재 관련 옵션은 모두 켜져 있다.
 
 ### 실행
 
@@ -404,6 +425,7 @@ mapping:=auto
 - `mapping:=true`로 강제 맵핑이 되는지 확인
 - `mapping:=false`로 강제 순찰이 되는지 확인
 - RViz, 카메라 뷰어, 화재 감지를 arg로 끄고 켤 수 있는지 확인
+- 기본값이 `use_gazebo_gui:=true`, `use_camera_viewer:=true`, `use_fire_detection:=true`, `use_fire_response:=true`로 동작하는지 확인
 
 ### 빠른 확인 명령
 
@@ -424,7 +446,7 @@ roslaunch --files night_patrol_robot patrol_one_button.launch mapping:=false
 
 ## 권장 검증 순서
 
-1. `office_patrol_nov4.world`에서 초기 맵핑 검증
+1. `office_patrol_no_homebay.world`에서 초기 맵핑 검증
 2. 반복 실패 frontier가 완료 전환으로 빠지는지 확인
 3. `maps/patrol_map.yaml` 저장 확인
 4. 맵 저장 후 home 복귀 확인

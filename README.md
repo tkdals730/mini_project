@@ -13,7 +13,7 @@ Gazebo 시뮬레이션 환경에서 TurtleBot3 Waffle Pi를 사용해 야간 순
 - `schedule_enabled:=true`로 지정 시간대에만 순찰을 시작하고, 종료 시각 이후에는 진행 중인 순찰 cycle을 마친 뒤 home 복귀 후 종료
 - 카메라 RGB 이미지에서 빨강/주황 계열을 감지하는 화재 감지 노드
 - 화재 후보가 일정 시간 이상 보이면 순찰을 일시 정지하고, 추가 확인 후 `/patrol_alert`를 publish하는 대응 노드
-- RViz 설정과 카메라 디버그 이미지 뷰어 실행 옵션 제공
+- RViz 설정과 카메라 디버그 이미지 뷰어를 기본 실행하고, 필요 시 옵션으로 비활성화 가능
 
 ## 패키지 구조
 
@@ -32,11 +32,13 @@ night_patrol_robot/
 
 이 프로젝트는 `launch/patrol_one_button.launch`를 기본 진입점으로 사용합니다. 기본값인 `mapping:=auto`는 저장된 맵이 없으면 맵을 생성하고, 맵이 있으면 저장 맵 기반 순찰을 실행합니다. 내부 실행은 `launch/patrol_runtime.launch`가 담당하므로, 기본 월드와 frontier 튜닝 값은 두 launch 파일이 같은 의미를 갖도록 맞춰 둡니다.
 
+현재 기본 월드는 `worlds/office_patrol_no_homebay.world`입니다. 기본 실행에서는 Gazebo GUI, RViz, 카메라 이미지 뷰어, 화재 감지 노드, 화재 대응 노드가 함께 켜집니다. 카메라 뷰어는 `/fire_detection/debug_image`를 표시하므로, 화재 감지 노드가 켜져 있어야 이미지가 들어옵니다.
+
 전체 운영/검증 흐름은 `docs/workflows.md`에 정리되어 있습니다.
 
 ### 빠른 시작
 
-이미 저장된 기준 맵(`maps/patrol_map.yaml`)이 있는 상태에서 순찰, waypoint marker, 화재 감지 디버그 화면까지 바로 확인하려면 다음 명령을 사용합니다.
+이미 저장된 기준 맵(`maps/patrol_map.yaml`)이 있는 상태에서 순찰, waypoint marker, Gazebo 화면, 화재 감지 디버그 화면, 화재 대응까지 바로 확인하려면 다음 명령을 사용합니다.
 
 ```bash
 cd ~/catkin_ws
@@ -57,7 +59,7 @@ source devel/setup.bash
 
 ### 2. 자동 모드 실행
 
-맵 파일이 없으면 Gazebo, TurtleBot3, SLAM, `move_base`, frontier 탐색, 자동 맵 저장, 화재 감지를 함께 실행합니다. 이미 `maps/patrol_map.yaml`이 있으면 저장된 맵 기반 순찰 모드로 실행됩니다.
+맵 파일이 없으면 Gazebo, TurtleBot3, SLAM, `move_base`, frontier 탐색, 자동 맵 저장, 화재 감지, 화재 대응을 함께 실행합니다. 이미 `maps/patrol_map.yaml`이 있으면 저장된 맵 기반 순찰 모드로 실행됩니다.
 
 ```bash
 roslaunch night_patrol_robot patrol_one_button.launch
@@ -65,7 +67,7 @@ roslaunch night_patrol_robot patrol_one_button.launch
 
 ### 3. 맵 생성 모드 강제 실행
 
-Gazebo, TurtleBot3, SLAM, `move_base`, frontier 탐색, 화재 감지를 함께 실행합니다.
+Gazebo, TurtleBot3, SLAM, `move_base`, frontier 탐색, 화재 감지, 화재 대응을 함께 실행합니다.
 
 ```bash
 roslaunch night_patrol_robot patrol_one_button.launch mapping:=true
@@ -77,7 +79,7 @@ roslaunch night_patrol_robot patrol_one_button.launch mapping:=true
 roslaunch night_patrol_robot patrol_one_button.launch mapping:=true use_rviz:=false use_camera_viewer:=false
 ```
 
-frontier 선택 기준을 조정하면서 실행할 수도 있습니다. `office_patrol_nov4.world` 기준 기본값은 정보량이 큰 frontier를 우선하고, 실패한 상단 끝 frontier가 반복될 때 탐색 완료로 빠질 수 있도록 조정되어 있습니다.
+frontier 선택 기준을 조정하면서 실행할 수도 있습니다. `office_patrol_no_homebay.world` 기준 기본값은 정보량이 큰 frontier를 우선하고, 실패한 frontier가 반복될 때 탐색 완료로 빠질 수 있도록 조정되어 있습니다.
 
 ```bash
 roslaunch night_patrol_robot patrol_one_button.launch mapping:=true frontier_area_blacklist_radius:=0.6 frontier_min_cluster_size:=5
@@ -95,7 +97,7 @@ roslaunch night_patrol_robot save_patrol_map.launch
 
 ### 5. 순찰 모드 강제 실행
 
-저장된 맵, AMCL, `move_base`, waypoint 순찰, 화재 감지를 함께 실행합니다.
+저장된 맵, AMCL, `move_base`, waypoint 순찰, 화재 감지, 화재 대응을 함께 실행합니다.
 
 ```bash
 roslaunch night_patrol_robot patrol_one_button.launch mapping:=false
@@ -128,14 +130,17 @@ roslaunch night_patrol_robot patrol_one_button.launch schedule_enabled:=true sta
 ### 자주 쓰는 옵션
 
 ```bash
-# 최신 월드 대신 다른 월드로 실행
+# 기본 월드 대신 다른 월드로 실행
 roslaunch night_patrol_robot patrol_one_button.launch mapping:=true world_name:=$(rospack find night_patrol_robot)/worlds/office_fire_detection_test.world
 
-# 화재 감지 없이 순찰만 확인
-roslaunch night_patrol_robot patrol_one_button.launch mapping:=false use_fire_detection:=false
+# 화재 감지/대응 없이 순찰만 확인
+roslaunch night_patrol_robot patrol_one_button.launch mapping:=false use_fire_detection:=false use_fire_response:=false camera_view_topic:=/camera/rgb/image_raw
 
 # 순찰을 한 바퀴만 실행
 roslaunch night_patrol_robot patrol_one_button.launch mapping:=false patrol_loop:=false
+
+# 화면 부하가 크면 Gazebo GUI, RViz, 카메라 뷰어를 선택적으로 끔
+roslaunch night_patrol_robot patrol_one_button.launch mapping:=false use_gazebo_gui:=false use_rviz:=false use_camera_viewer:=false
 
 # 예약 순찰에서 Gazebo를 미리 띄우고 시간대에 맞춰 순찰 launch만 시작
 roslaunch night_patrol_robot patrol_one_button.launch schedule_enabled:=true preload_gazebo:=true
@@ -144,11 +149,20 @@ roslaunch night_patrol_robot patrol_one_button.launch schedule_enabled:=true pre
 roslaunch night_patrol_robot patrol_one_button.launch schedule_enabled:=true reset_gazebo_pose_on_start:=false
 ```
 
-## 실행 화면
+## 실행 화면 및 결과
 
-| 자동 waypoint | waypoint 이동 | 화재 경보 |
+| 맵핑 결과 | 자동 waypoint | waypoint 순찰 |
 | --- | --- | --- |
-| ![자동 waypoint](screenshoots/auto_waypoint.png) | ![waypoint 이동](screenshoots/go_waypoint.png) | ![화재 경보](screenshoots/fire_alter.png) |
+| ![맵핑 결과](screenshoots/mapping_result.png) | ![자동 waypoint](screenshoots/waypoint.png) | ![waypoint 순찰](screenshoots/go_waypoint.png) |
+
+| 순찰 cycle | 화재 경보 |
+| --- | --- |
+| ![순찰 cycle](screenshoots/patrol_cycle.png) | ![화재 경보](screenshoots/fire_alter.png) |
+
+시연 영상:
+
+- [맵핑 결과 10초 영상](result/mapping_result_10sec.mp4)
+- [waypoint 순찰 2분 영상](result/waypoint_patrol_2min.mp4)
 
 ## 주요 launch 파일
 
@@ -170,12 +184,13 @@ roslaunch night_patrol_robot patrol_one_button.launch schedule_enabled:=true res
 
 ## 현재 진행 상태
 
-- `worlds/office_patrol_nov4.world` 기반의 최신 사무실 월드를 기본 실행 환경으로 사용합니다.
+- `worlds/office_patrol_no_homebay.world` 기반의 최신 사무실 월드를 기본 실행 환경으로 사용합니다.
 - `maps/patrol_map.yaml`과 `maps/patrol_map.pgm`은 저장 맵 기반 순찰에 사용할 기준 산출물로 갱신되어 있습니다.
 - frontier 탐색은 cluster 단위 후보 생성, viewpoint 후보, 정보량, 거리, 장애물 근접도, goal/frontier blacklist를 함께 반영해 goal을 선택합니다.
 - `frontier_max_goal_distance` 기본값을 `0.0`으로 두어 먼 미탐사 frontier도 후보에서 제외하지 않도록 조정했습니다. 실행 로그에서 먼 frontier goal 선택과 반복 실패 후 `/exploration_complete` 발행을 확인했습니다.
 - 초기 맵핑, 자동 맵 저장, 저장 맵 기반 waypoint 순찰, 순찰 완료 후 home 복귀 흐름을 확인했습니다.
 - RViz에서 `Patrol Waypoints` marker로 순찰 waypoint, home entry, home 위치와 순찰 경로를 확인할 수 있습니다.
+- Gazebo GUI, RViz, 카메라 뷰어, 화재 감지, 화재 대응은 현재 기본으로 켜져 있습니다.
 - 화재 감지는 현재 Gazebo 테스트 오브젝트에 맞춘 색상 threshold 방식이며, 실제 화재 일반화 모델은 아직 아닙니다.
 - 화재 대응은 오탐을 줄이기 위해 즉시 경보가 아니라 `빠른 정지 -> 추가 확인 -> 경보 발행` 순서로 동작합니다.
 - Gazebo 테스트에서 화재 후보 감지 시 정지, 일정 시간 이상 감지 시 alert 표시, 화재 후보 해제 후 순찰 재개, home 복귀까지 확인했습니다.
@@ -194,11 +209,12 @@ roslaunch night_patrol_robot patrol_one_button.launch schedule_enabled:=true res
 ## 개발 메모
 
 - 기본 mapping 전략은 `mapping_strategy:=frontier`입니다.
-- 기본 월드는 `worlds/office_patrol_nov4.world`입니다.
+- 기본 월드는 `worlds/office_patrol_no_homebay.world`입니다.
+- 기본 실행 옵션은 `use_gazebo:=true`, `use_gazebo_gui:=true`, `use_rviz:=true`, `use_camera_viewer:=true`, `use_fire_detection:=true`, `use_fire_response:=true`입니다.
 - 순찰 waypoint는 저장 맵에서 자동 생성한 `maps/generated_patrol_waypoints.yaml`을 사용합니다. 자동 생성 파일을 만들거나 읽지 못하면 순찰을 시작하지 않습니다.
 - home 복귀 위치는 `home_approach_waypoint`와 `home_waypoint` 파라미터에서 수정합니다.
 - Gazebo spawn pose와 AMCL initial pose는 `spawn_*`, `initial_pose_*` launch arg로 분리되어 있습니다.
-- 화재 감지 디버그 이미지는 기본적으로 `/fire_detection/debug_image`에서 확인합니다.
+- 화재 감지 디버그 이미지는 기본적으로 `/fire_detection/debug_image`에서 확인합니다. 순수 카메라 원본만 보고 싶으면 `camera_view_topic:=/camera/rgb/image_raw`로 바꿉니다.
 - 화재 대응 기본값은 최근 1.5초 중 0.25초 이상 감지 시 정지, 정지 후 최근 5초 중 2.5초 이상 감지 시 `/patrol_alert` 발행, 최근 5초 중 0.2초 이하로 떨어지면 해제입니다.
 - 예약 순찰 종료 요청은 `/patrol_stop_requested`로 전달되고, 순찰 노드는 한 cycle과 home 복귀를 마친 뒤 `/patrol_finished`를 publish합니다.
 - 예약 순찰 시작 전 Gazebo 모델 pose reset은 `/gazebo/set_model_state`를 사용하며, 기본 모델명은 `turtlebot3_waffle_pi`입니다.
