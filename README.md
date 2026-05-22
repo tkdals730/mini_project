@@ -158,10 +158,16 @@ roslaunch night_patrol_robot patrol_one_button.launch schedule_enabled:=true res
 | --- | --- |
 | ![순찰 cycle](screenshoots/patrol_cycle.png) | ![화재 경보](screenshoots/fire_alter.png) |
 
-시연 영상:
+시연 영상은 아래 썸네일을 클릭해서 확인합니다.
 
-- [맵핑 결과 10초 영상](result/mapping_result_10sec.mp4)
-- [waypoint 순찰 2분 영상](result/waypoint_patrol_2min.mp4)
+| 맵핑 결과 10초 영상 | waypoint 순찰 2분 영상 |
+| --- | --- |
+| [![맵핑 결과 10초 영상](screenshoots/mapping_result.png)](result/mapping_result_10sec.mp4) | [![waypoint 순찰 2분 영상](screenshoots/patrol_cycle.png)](result/waypoint_patrol_2min.mp4) |
+
+직접 링크:
+
+- [맵핑 결과 10초 영상 열기](result/mapping_result_10sec.mp4)
+- [waypoint 순찰 2분 영상 열기](result/waypoint_patrol_2min.mp4)
 
 ## 주요 launch 파일
 
