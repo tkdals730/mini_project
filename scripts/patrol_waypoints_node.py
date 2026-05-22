@@ -40,6 +40,9 @@ class PatrolWaypointsNode:
         self.return_home_enabled = rospy.get_param("~return_home", True)
         self.wait_after_goal_sec = rospy.get_param("~wait_after_goal_sec", 5.0)
         self.goal_timeout = rospy.Duration(rospy.get_param("~goal_timeout_sec", 75.0))
+        self.home_goal_timeout = rospy.Duration(
+            rospy.get_param("~home_goal_timeout_sec", self.goal_timeout.to_sec())
+        )
         # 위치 초기화 직후 goal을 보내면 경로가 흔들릴 수 있어서 대기 시간을 둔다.
         self.initial_wait_sec = rospy.get_param("~initial_wait_sec", 2.0)
         self.waypoints_file = rospy.get_param("~waypoints_file", "")
@@ -284,7 +287,9 @@ class PatrolWaypointsNode:
         markers.markers.append(route)
         self.marker_pub.publish(markers)
 
-    def _send_goal_and_wait(self, waypoint, label):
+    def _send_goal_and_wait(self, waypoint, label, timeout=None):
+        if timeout is None:
+            timeout = self.goal_timeout
         goal = self._build_goal(waypoint)
         while not rospy.is_shutdown():
             self._wait_while_paused()
@@ -297,7 +302,7 @@ class PatrolWaypointsNode:
                 waypoint.get("yaw", 0.0),
             )
             self.client.send_goal(goal)
-            deadline = rospy.Time.now() + self.goal_timeout
+            deadline = rospy.Time.now() + timeout
 
             while not rospy.is_shutdown():
                 if self.patrol_paused:
@@ -318,7 +323,7 @@ class PatrolWaypointsNode:
 
                 if rospy.Time.now() >= deadline:
                     self.client.cancel_goal()
-                    rospy.logwarn("%s timed out after %.1f sec.", label, self.goal_timeout.to_sec())
+                    rospy.logwarn("%s timed out after %.1f sec.", label, timeout.to_sec())
                     return GoalStatus.ABORTED
 
             self._wait_while_paused()
@@ -356,7 +361,9 @@ class PatrolWaypointsNode:
         home_entry_reached = True
         if self._has_home_approach_waypoint():
             state = self._send_goal_and_wait(
-                self.home_approach_waypoint, "home entry waypoint"
+                self.home_approach_waypoint,
+                "home entry waypoint",
+                self.home_goal_timeout,
             )
             if state != GoalStatus.SUCCEEDED:
                 rospy.logwarn("Home entry failed with state %d.", state)
@@ -364,7 +371,11 @@ class PatrolWaypointsNode:
             else:
                 self._wait_at_waypoint(self.home_approach_waypoint, "Home entry")
 
-        state = self._send_goal_and_wait(self.home_waypoint, "home waypoint")
+        state = self._send_goal_and_wait(
+            self.home_waypoint,
+            "home waypoint",
+            self.home_goal_timeout,
+        )
         if state == GoalStatus.SUCCEEDED:
             self._wait_at_waypoint(self.home_waypoint, "Home waypoint")
             if home_entry_reached:
