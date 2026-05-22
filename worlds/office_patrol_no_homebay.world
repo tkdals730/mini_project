@@ -117,8 +117,8 @@
     </model>
 
     <!-- 상단 사무실 책상 2개 -->
-    <model name="office_desk_1"><static>true</static><pose>0.55 8.85 0.38 0 0 0</pose><link name="link"><collision name="col"><geometry><box><size>1.8 0.6 0.75</size></box></geometry></collision><visual name="vis"><geometry><box><size>1.8 0.6 0.75</size></box></geometry><material><ambient>0.55 0.36 0.18 1</ambient><diffuse>0.55 0.36 0.18 1</diffuse></material></visual></link></model>
-    <model name="office_desk_2"><static>true</static><pose>0.55 9.70 0.38 0 0 0</pose><link name="link"><collision name="col"><geometry><box><size>1.8 0.6 0.75</size></box></geometry></collision><visual name="vis"><geometry><box><size>1.8 0.6 0.75</size></box></geometry><material><ambient>0.55 0.36 0.18 1</ambient><diffuse>0.55 0.36 0.18 1</diffuse></material></visual></link></model>
+    <!-- <model name="office_desk_1"><static>true</static><pose>0.55 8.85 0.38 0 0 0</pose><link name="link"><collision name="col"><geometry><box><size>1.8 0.6 0.75</size></box></geometry></collision><visual name="vis"><geometry><box><size>1.8 0.6 0.75</size></box></geometry><material><ambient>0.55 0.36 0.18 1</ambient><diffuse>0.55 0.36 0.18 1</diffuse></material></visual></link></model>
+    <model name="office_desk_2"><static>true</static><pose>0.55 9.70 0.38 0 0 0</pose><link name="link"><collision name="col"><geometry><box><size>1.8 0.6 0.75</size></box></geometry></collision><visual name="vis"><geometry><box><size>1.8 0.6 0.75</size></box></geometry><material><ambient>0.55 0.36 0.18 1</ambient><diffuse>0.55 0.36 0.18 1</diffuse></material></visual></link></model> -->
 
     <!-- 대표실 책상 -->
     <model name="ceo_desk"><static>true</static><pose>-2.75 6.65 0.38 0 0 1.5708</pose><link name="link"><collision name="col"><geometry><box><size>1.6 0.8 0.75</size></box></geometry></collision><visual name="vis"><geometry><box><size>1.6 0.8 0.75</size></box></geometry><material><ambient>0.55 0.36 0.18 1</ambient><diffuse>0.55 0.36 0.18 1</diffuse></material></visual></link></model>
