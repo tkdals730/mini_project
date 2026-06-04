@@ -169,6 +169,13 @@ roslaunch night_patrol_robot patrol_one_button.launch schedule_enabled:=true res
 - [맵핑 결과 10초 영상 열기](result/mapping_result_10sec.mp4)
 - [waypoint 순찰 2분 영상 열기](result/waypoint_patrol_2min.mp4)
 
+실행중인 노드
+<img width="5636" height="1028" alt="rosgraph_active" src="https://github.com/user-attachments/assets/51ae8b0f-83f2-41d4-b5f4-5f8f077c7e58" />
+전체 토픽 노드
+<img width="5739" height="1366" alt="rosgraph_all" src="https://github.com/user-attachments/assets/e2fc1fe0-2229-4bea-9ba7-c8bc22b45e9c" />
+전체 노드
+<img width="3884" height="1024" alt="rosgraph_node" src="https://github.com/user-attachments/assets/ede7510e-1242-471b-b400-2392ff4ad4b4" />
+
 ## 주요 launch 파일
 
 - `launch/gazebo_robot.launch`: Gazebo empty world 실행, TurtleBot3 URDF 로드, 로봇 spawn
